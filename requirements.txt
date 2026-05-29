@@ -1,0 +1,6 @@
+# Añadir dependencias necesarias aquí
+opencv-python
+numpy
+mediapipe>=0.10.0
+customtkinter>=5.2.0
+pyautogui

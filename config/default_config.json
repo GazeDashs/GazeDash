@@ -1,0 +1,97 @@
+{
+  "active_profile": "navegacion",
+  "smoothing_alpha": 0.5,
+  "gesture_cooldown": 0.5,
+  "camera_index": 0,
+  "face_landmarks": {
+    "indices": {
+      "left_brow_inner": 70,
+      "left_brow_mid": 296,
+      "left_brow_outer": 107,
+      "right_brow_inner": 300,
+      "right_brow_mid": 66,
+      "right_brow_outer": 336,
+      "left_eye_top": 159,
+      "left_eye_bottom": 145,
+      "right_eye_top": 386,
+      "right_eye_bottom": 374,
+      "mouth_top": 13,
+      "mouth_bottom": 14,
+      "mouth_left": 61,
+      "mouth_right": 291
+    },
+    "offsets": {
+      "left_brow_inner": [0, 0],
+      "left_brow_mid": [0, 0],
+      "left_brow_outer": [0, 0],
+      "right_brow_inner": [0, 0],
+      "right_brow_mid": [0, 0],
+      "right_brow_outer": [0, 0],
+      "left_eye_top": [0, 0],
+      "left_eye_bottom": [0, 0],
+      "right_eye_top": [0, 0],
+      "right_eye_bottom": [0, 0],
+      "mouth_top": [0, 0],
+      "mouth_bottom": [0, 0],
+      "mouth_left": [0, 0],
+      "mouth_right": [0, 0]
+    }
+  },
+  "profiles": {
+    "navegacion": {
+      "display_name": "Navegación",
+      "description": "Perfil base para control asistivo con la cara. Diseñado para disparar acciones de navegación, edición y confirmación mediante gestos faciales.",
+      "gesture_thresholds": {
+        "mouth_pucker": 0.5,
+        "mouth_open": 0.6,
+        "mouth_funnel": 0.5,
+        "smile": 0.5,
+        "brow_raise": 0.5,
+        "brow_frown": 0.4,
+        "eye_blink": 0.7,
+        "eye_wide": 0.6,
+        "nose_sneer": 0.4,
+        "mouth_conflict_margin": 0.05
+      },
+      "gesture_actions": {
+        "mouth_open": {
+          "type": "hotkey",
+          "keys": ["ctrl", "c"],
+          "label": "copiar"
+        },
+        "smile_right": {
+          "type": "hotkey",
+          "keys": ["tab"],
+          "label": "Tab"
+        },
+        "smile_left": {
+          "type": "hotkey",
+          "keys": ["backspace"],
+          "label": "Eliminar"
+        },
+        "mouth_pucker": {
+          "type": "hotkey",
+          "keys": ["ctrl", "v"],
+          "label": "Pegar"
+        },
+        "smile": {
+          "type": "hotkey",
+          "keys": ["ctrl", "x"],
+          "label": "Cortar"
+        },
+        "eye_wide": {
+          "type": "hotkey",
+          "keys": ["enter"],
+          "label": "Enter"
+        }
+      },
+      "mouse_settings": {
+        "enabled": true,
+        "dead_zone": 25.0,
+        "max_speed": 35.0,
+        "smoothing": 0.2,
+        "center": null
+      }
+    }
+  }
+}

@@ -1,22 +1,30 @@
 # GazeDash
 
-Software de accesibilidad para utilizar funciones de la computadora a traves de gestos faciales y movimientos de cabeza.
+Proyecto de la feria de ciencias 2026.  
+Software de accesibilidad que permite controlar funciones de la computadora a través de gestos faciales y movimientos de cabeza.
 
 ## Estado actual
 
-El repositorio contiene una estructura base para la aplicacion principal y dos prototipos funcionales:
+El repositorio contiene la estructura base para la aplicación principal, diseñada en Python, pero la mayoría de los módulos aún son *placeholders* (esqueleto sin funcionalidad final implementada).  
+Actualmente incluye lo siguiente:
 
-- `app/`, `core/`, `vision/`, `ui/`, `config/`, `storage/`, `utils/`: base modular de GazeDash, todavia mayormente placeholder.
+- **Estructura modular de carpetas**:  
+  - `app/`: entrada principal de la aplicación
+  - `core/`, `vision/`, `ui/`, `config/`, `storage/`, `utils/`
+- **Primeros prototipos funcionales (muy básicos)** orientados a la integración con *CustomTkinter* y vista de la ventana principal.
 
-## Documentacion
+## Roadmap próximo
 
-- [Mapa del proyecto](docs/PROJECT_OVERVIEW.md)
-- [Plan de reestructuracion](docs/RESTRUCTURING_PLAN.md)
+- Desarrollo de lógica central en los módulos `core` y `vision`
+- Implementación de la detección de gestos y movimientos de cabeza
+- Sistema de configuración y almacenamiento de preferencias
+- Interfaz de usuario accesible personalizada
 
-## Ejecutar aplicacion base
+## Ejecución de la aplicación base
 
 ```bash
 python -m app.main
 ```
 
-La aplicacion base abre la ventana principal en CustomTkinter con accesos a configuracion y calibracion.
+La aplicación abre la ventana principal en CustomTkinter con accesos a configuración y calibración.  
+Por ahora, estas funcionalidades son limitadas o simuladas mientras se avanza el desarrollo.

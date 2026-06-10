@@ -11,6 +11,7 @@ from vision.gesture_detection.facial_gestures import FacialGestureDetector
 from core.gesture_engine.cooldown_manager import CooldownManager
 from core.gesture_engine.gesture_mapper import map_gesture
 from core.gesture_engine.hotkey_executor import HotkeyExecutor
+from core.voice_control.voice_control import VoiceCommandController
 
 class AppController:
     _GESTURE_META_KEYS = {"has_face", "calibrating", "calibration_progress"}
@@ -32,6 +33,8 @@ class AppController:
         )
         self.gesture_detector = FacialGestureDetector()
         self.gesture_executor = HotkeyExecutor()
+        self.voice_controller = VoiceCommandController(self.config, status_callback=lambda message: print(f"Voz: {message}"))
+        self.voice_controller.start()
         self.cooldown_manager = CooldownManager(cooldown_seconds=0.5) 
         # interactive landmark adjustment state
         self._last_face_landmarks = None
@@ -85,6 +88,7 @@ class AppController:
                     self._last_frame_size = frame.shape[:2]
                 gestures = self.gesture_detector.detect(face_data)
                 self._handle_gestures(gestures)
+                self.voice_controller.handle_gesture_input(gestures)
                 if raw_face_result is not None:
                     self.draw_face_mesh(frame, raw_face_result)
                 if face_data is not None:
@@ -111,6 +115,7 @@ class AppController:
         finally:
             close_camera(self.cap)
             self.face_detector.close()
+            self.voice_controller.stop()
             cv2.destroyAllWindows()
 
     def draw_face_mesh(self, frame, face_result):

@@ -11,6 +11,7 @@ from PIL import Image, ImageTk
 from core.gesture_engine.cooldown_manager import CooldownManager
 from core.gesture_engine.gesture_mapper import map_gesture
 from core.gesture_engine.hotkey_executor import HotkeyExecutor
+from core.voice_control.voice_control import VoiceCommandController
 from vision.camera.camera_stream import close_camera, open_camera, read_frame
 from vision.face_tracking.face_detector import MediaPipeFaceDetector
 from vision.gesture_detection.facial_gestures import FacialGestureDetector
@@ -71,6 +72,7 @@ class GazeDashApp(ctk.CTk):
         self._last_nose_tip = None
         self._gesture_detector = FacialGestureDetector()
         self._gesture_executor = HotkeyExecutor()
+        self._voice_controller = VoiceCommandController(self._config, status_callback=self._set_voice_status)
         self._cooldown_manager = CooldownManager(cooldown_seconds=0.5)
         self._mouse_controller = None
         self._blink_click_controller = BlinkClickController()
@@ -85,6 +87,7 @@ class GazeDashApp(ctk.CTk):
         self._build_main_content()
         self.refresh_state()
         self.controller_status.configure(text="Controlador: activo en la vista principal")
+        self._voice_controller.start()
         self.start_camera_preview()
 
     def _load_mouse_settings(self):
@@ -115,7 +118,13 @@ class GazeDashApp(ctk.CTk):
         save_config(updated)
         self._config = updated
         self.refresh_state()
-        messagebox.showinfo("GazeDash", "Centro del mouse recalibrado y guardado para el perfil activo.")
+
+    def _set_voice_status(self, message):
+        if hasattr(self, "voice_status_label"):
+            try:
+                self.voice_status_label.configure(text=f"Voz: {message}")
+            except Exception:
+                pass
 
     def _build_sidebar(self):
         self.sidebar = ctk.CTkFrame(self, width=280, corner_radius=0, fg_color="#111827")
@@ -201,7 +210,9 @@ class GazeDashApp(ctk.CTk):
         create_button(action_row, "Recargar datos", self.refresh_state).grid(row=0, column=2, sticky="ew", padx=4)
 
         self.controller_status = ctk.CTkLabel(actions, text="Controlador: detenido", anchor="w")
-        self.controller_status.grid(row=3, column=0, sticky="w", padx=22, pady=(0, 18))
+        self.controller_status.grid(row=3, column=0, sticky="w", padx=22, pady=(0, 8))
+        self.voice_status_label = ctk.CTkLabel(actions, text="Voz: detenido", anchor="w")
+        self.voice_status_label.grid(row=4, column=0, sticky="w", padx=22, pady=(0, 18))
 
     def _make_metric_card(self, parent, column, title, value):
         card = ctk.CTkFrame(parent, fg_color="#111827", corner_radius=18)
@@ -214,6 +225,7 @@ class GazeDashApp(ctk.CTk):
 
     def refresh_state(self, *_):
         self._config = load_config()
+        self._voice_controller.update_config(self._config)
         profile_name = get_active_profile_name(self._config)
         _, profile = get_profile_details(self._config, profile_name)
         thresholds = get_effective_thresholds(self._config, profile_name)
@@ -433,6 +445,7 @@ class GazeDashApp(ctk.CTk):
                     detected_input, detected_gesture = self._summarize_input(gestures)
                     if self._controller_active:
                         self._handle_gestures(gestures)
+                        self._voice_controller.handle_gesture_input(gestures)
                     else:
                         self._last_detected_input = detected_input
                         self._last_detected_gesture = detected_gesture
@@ -467,6 +480,7 @@ class GazeDashApp(ctk.CTk):
             except Exception:
                 pass
             self._camera_detector = None
+        self._voice_controller.stop()
 
     def _on_close(self):
         self.stop_camera_preview()

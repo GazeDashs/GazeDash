@@ -15,15 +15,20 @@ from ui.settings_store import (
     get_profile_actions,
     get_profile_details,
     get_profile_mouse_settings,
+    get_profile_voice_actions,
     get_profiles,
+    get_voice_control_settings,
     load_config,
     parse_hotkey_spec,
     remove_profile_gesture_action,
+    remove_profile_voice_action,
     save_config,
     set_general_settings,
     set_profile_gesture_action,
     set_profile_mouse_settings,
     set_profile_thresholds,
+    set_profile_voice_action,
+    set_voice_control_settings,
 )
 
 
@@ -93,6 +98,27 @@ def _render_profile_actions(actions):
         lines.append(f"{gesture_name}: {_format_action(action)}")
 
     return "\n".join(lines) if lines else "Sin acciones configuradas para este perfil."
+
+
+def _render_voice_actions(actions):
+    if not isinstance(actions, dict):
+        return "Sin acciones de voz configuradas para este perfil."
+    lines = [f"{command}: {_format_action(action)}" for command, action in actions.items()]
+    return "\n".join(lines) if lines else "Sin acciones de voz configuradas para este perfil."
+
+
+def _make_text_entry_row(parent, label_text, value=""):
+    row = ctk.CTkFrame(parent, fg_color="#17202A", corner_radius=14)
+    row.grid_columnconfigure(0, weight=1)
+
+    label = ctk.CTkLabel(row, text=label_text, anchor="w")
+    label.grid(row=0, column=0, sticky="w", padx=14, pady=(10, 0))
+
+    entry = ctk.CTkEntry(row)
+    entry.grid(row=1, column=0, sticky="ew", padx=14, pady=(8, 14))
+    entry.delete(0, "end")
+    entry.insert(0, str(value or ""))
+    return row, entry
 
 
 def open_config_panel(master=None, config_manager=None):
@@ -170,12 +196,35 @@ def open_config_panel(master=None, config_manager=None):
     binding_buttons.grid(row=3, column=0, sticky="ew")
     binding_buttons.grid_columnconfigure((0, 1, 2), weight=1)
 
+    voice_binding_card, voice_binding_body = _section_card(left_panel, "Comandos de voz", "Enlaza una etiqueta de comando a un hotkey")
+    voice_binding_card.grid(row=2, column=0, sticky="ew", pady=(0, 16))
+
+    voice_command_entry = ctk.CTkEntry(voice_binding_body, placeholder_text="Comando de voz (etiqueta)")
+    voice_command_entry.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+
+    voice_keys_entry = ctk.CTkEntry(voice_binding_body, placeholder_text="Ej: ctrl+w, alt+f4")
+    voice_keys_entry.grid(row=1, column=0, sticky="ew", pady=(0, 10))
+
+    voice_label_entry = ctk.CTkEntry(voice_binding_body, placeholder_text="Etiqueta visible")
+    voice_label_entry.grid(row=2, column=0, sticky="ew", pady=(0, 12))
+
+    voice_buttons = ctk.CTkFrame(voice_binding_body, fg_color="transparent")
+    voice_buttons.grid(row=3, column=0, sticky="ew")
+    voice_buttons.grid_columnconfigure((0, 1, 2), weight=1)
+
     actions_card, actions_body = _section_card(left_panel, "Acciones del perfil", "Vista rápida de los gestos ya enlazados")
-    actions_card.grid(row=2, column=0, sticky="nsew")
+    actions_card.grid(row=3, column=0, sticky="nsew")
     actions_body.grid_rowconfigure(0, weight=1)
-    profile_actions_box = ctk.CTkTextbox(actions_body, height=220)
+    profile_actions_box = ctk.CTkTextbox(actions_body, height=160)
     profile_actions_box.grid(row=0, column=0, sticky="nsew")
     profile_actions_box.configure(state="disabled")
+
+    voice_actions_card, voice_actions_body = _section_card(left_panel, "Acciones de voz", "Vista rápida de comandos de voz configurados")
+    voice_actions_card.grid(row=4, column=0, sticky="nsew")
+    voice_actions_body.grid_rowconfigure(0, weight=1)
+    voice_actions_box = ctk.CTkTextbox(voice_actions_body, height=160)
+    voice_actions_box.grid(row=0, column=0, sticky="nsew")
+    voice_actions_box.configure(state="disabled")
 
     # Right column: thresholds
     thresholds_card, thresholds_body = _section_card(right_panel, "Umbrales", "Ajusta la sensibilidad del perfil activo")
@@ -187,8 +236,30 @@ def open_config_panel(master=None, config_manager=None):
     thresholds_scroll.grid(row=0, column=0, sticky="nsew")
     thresholds_scroll.grid_columnconfigure(0, weight=1)
 
+    voice_card, voice_body = _section_card(right_panel, "Control de voz", "Ajusta activación, descanso y ganancia para el micrófono")
+    voice_card.grid(row=1, column=0, sticky="ew", pady=(16, 0))
+    voice_body.grid_columnconfigure(0, weight=1)
+
+    voice_enabled_row, voice_enabled_switch, voice_enabled_var = _make_boolean_row(voice_body, "activar voz", False)
+    voice_enabled_row.grid(row=0, column=0, sticky="ew", pady=(0, 12))
+
+    activation_gesture_row, activation_gesture_entry = _make_text_entry_row(voice_body, "Gesto de activación", "mouth_pucker")
+    activation_gesture_row.grid(row=1, column=0, sticky="ew", pady=(0, 12))
+
+    activation_word_row, activation_word_entry = _make_text_entry_row(voice_body, "Palabra activación", "activar")
+    activation_word_row.grid(row=2, column=0, sticky="ew", pady=(0, 12))
+
+    listen_duration_row, listen_duration_slider = _make_slider_row(voice_body, "duración escucha", 10.0, 1.0, 20.0)
+    listen_duration_row.grid(row=3, column=0, sticky="ew", pady=(0, 12))
+
+    cooldown_row, cooldown_slider = _make_slider_row(voice_body, "cooldown", 5.0, 0.0, 15.0)
+    cooldown_row.grid(row=4, column=0, sticky="ew", pady=(0, 12))
+
+    gain_row, gain_slider = _make_slider_row(voice_body, "ganancia", 1.0, 1.0, 10.0)
+    gain_row.grid(row=5, column=0, sticky="ew", pady=(0, 12))
+
     mouse_card, mouse_body = _section_card(right_panel, "Mouse analógico", "Ajusta la zona muerta, la velocidad y la calibración por perfil")
-    mouse_card.grid(row=1, column=0, sticky="ew", pady=(16, 0))
+    mouse_card.grid(row=2, column=0, sticky="ew", pady=(16, 0))
     mouse_body.grid_columnconfigure(0, weight=1)
 
     mouse_scroll = ctk.CTkScrollableFrame(mouse_body, fg_color="#111827", corner_radius=14)
@@ -198,7 +269,7 @@ def open_config_panel(master=None, config_manager=None):
     ctk.CTkLabel(mouse_body, text="Usa el botón de recalibración en la ventana principal para guardar tu punto neutro actual.", wraplength=420, justify="left", text_color="#D1D5DB").grid(row=1, column=0, sticky="ew", padx=18, pady=(10, 12))
 
     summary_card, summary_body = _section_card(right_panel, "Resumen", "Información del perfil y guardado")
-    summary_card.grid(row=2, column=0, sticky="ew", pady=(16, 0))
+    summary_card.grid(row=3, column=0, sticky="ew", pady=(16, 0))
 
     summary_labels = [
         ctk.CTkLabel(summary_body, text="", anchor="w"),
@@ -289,6 +360,20 @@ def open_config_panel(master=None, config_manager=None):
         status_label.grid(row=4, column=0, sticky="ew", padx=18, pady=(4, 0))
         form_state["mouse_widgets"]["center_status"] = status_label
 
+    def refresh_voice_settings(profile_name=None):
+        voice_config = get_voice_control_settings(current_config())
+        voice_enabled_var.set(bool(voice_config.get("enabled", False)))
+        activation_gesture_entry.delete(0, "end")
+        activation_gesture_entry.insert(0, voice_config.get("activation_gesture", "mouth_pucker"))
+        activation_word_entry.delete(0, "end")
+        activation_word_entry.insert(0, voice_config.get("activation_word", "activar"))
+        listen_duration_slider.set(float(voice_config.get("listen_duration", 10.0)))
+        cooldown_slider.set(float(voice_config.get("cooldown_seconds", 5.0)))
+        gain_slider.set(float(voice_config.get("gain", 1.0)))
+
+        voice_actions = get_profile_voice_actions(current_config(), profile_name or current_profile_name())
+        set_textbox_value(voice_actions_box, _render_voice_actions(voice_actions))
+
     def refresh_profile_summary(selected_profile=None):
         active_name = selected_profile or current_profile_name()
         profile_key, profile = get_profile_details(current_config(), active_name)
@@ -322,6 +407,7 @@ def open_config_panel(master=None, config_manager=None):
         build_mouse_widgets(selected_profile)
         refresh_profile_summary(selected_profile)
         load_binding(selected_profile, gesture_selector.get())
+        refresh_voice_settings(selected_profile)
 
     def create_profile():
         new_name = new_profile_entry.get().strip()
@@ -370,6 +456,35 @@ def open_config_panel(master=None, config_manager=None):
         load_binding(selected_profile, selected_gesture)
         messagebox.showinfo("GazeDash", f"Gesto eliminado: {selected_gesture}")
 
+    def save_voice_binding():
+        selected_profile = current_profile_name()
+        command_label = voice_command_entry.get().strip()
+        keys = parse_hotkey_spec(voice_keys_entry.get())
+        label = voice_label_entry.get().strip()
+
+        if not command_label or not keys:
+            messagebox.showwarning("GazeDash", "Escribi un comando de voz y al menos una tecla para guardarlo.")
+            return
+
+        updated = set_profile_voice_action(current_config(), selected_profile, command_label, keys=keys, label=label)
+        state["config"] = updated
+        save_config(updated)
+        refresh_all(selected_profile)
+        messagebox.showinfo("GazeDash", f"Acción de voz guardada: {command_label}")
+
+    def delete_voice_binding():
+        selected_profile = current_profile_name()
+        command_label = voice_command_entry.get().strip()
+        if not command_label:
+            messagebox.showwarning("GazeDash", "Escribi el comando de voz que queres eliminar.")
+            return
+
+        updated = remove_profile_voice_action(current_config(), selected_profile, command_label)
+        state["config"] = updated
+        save_config(updated)
+        refresh_all(selected_profile)
+        messagebox.showinfo("GazeDash", f"Acción de voz eliminada: {command_label}")
+
     def save_all():
         selected_profile = current_profile_name()
         thresholds_payload = {key: float(slider.get()) for key, slider in form_state["threshold_widgets"].items()}
@@ -391,6 +506,16 @@ def open_config_panel(master=None, config_manager=None):
         })
         updated = set_profile_mouse_settings(updated, selected_profile, mouse_settings_payload)
 
+        updated = set_voice_control_settings(
+            updated,
+            enabled=bool(voice_enabled_var.get()),
+            activation_gesture=activation_gesture_entry.get().strip(),
+            activation_word=activation_word_entry.get().strip(),
+            listen_duration=float(listen_duration_slider.get()),
+            cooldown_seconds=float(cooldown_slider.get()),
+            gain=float(gain_slider.get()),
+        )
+
         keys = parse_hotkey_spec(gesture_keys_entry.get())
         if keys:
             updated = set_profile_gesture_action(
@@ -399,6 +524,18 @@ def open_config_panel(master=None, config_manager=None):
                 current_gesture_name(),
                 keys=keys,
                 label=gesture_label_entry.get().strip(),
+            )
+
+        voice_command = voice_command_entry.get().strip()
+        voice_keys = parse_hotkey_spec(voice_keys_entry.get())
+        voice_label = voice_label_entry.get().strip()
+        if voice_command and voice_keys:
+            updated = set_profile_voice_action(
+                updated,
+                selected_profile,
+                voice_command,
+                keys=voice_keys,
+                label=voice_label,
             )
 
         state["config"] = updated
@@ -410,6 +547,9 @@ def open_config_panel(master=None, config_manager=None):
     create_button(binding_buttons, "Guardar gesto", save_binding).grid(row=0, column=0, sticky="ew", padx=(0, 6))
     create_button(binding_buttons, "Eliminar gesto", delete_binding).grid(row=0, column=1, sticky="ew", padx=6)
     create_button(binding_buttons, "Recargar", lambda: refresh_all(current_profile_name())).grid(row=0, column=2, sticky="ew", padx=(6, 0))
+    create_button(voice_buttons, "Guardar voz", save_voice_binding).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+    create_button(voice_buttons, "Eliminar voz", delete_voice_binding).grid(row=0, column=1, sticky="ew", padx=6)
+    create_button(voice_buttons, "Recargar", lambda: refresh_all(current_profile_name())).grid(row=0, column=2, sticky="ew", padx=(6, 0))
     create_button(footer, "Guardar todo", save_all).grid(row=0, column=0, sticky="ew", padx=(18, 8), pady=18)
     create_button(footer, "Cerrar", window.destroy).grid(row=0, column=1, sticky="ew", padx=(8, 18), pady=18)
 

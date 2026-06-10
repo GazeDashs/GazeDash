@@ -142,6 +142,63 @@ def get_profile_actions(config, profile_name=None):
     return actions if isinstance(actions, dict) else {}
 
 
+def get_profile_voice_actions(config, profile_name=None):
+    _, profile = get_profile_details(config, profile_name)
+    actions = profile.get("voice_actions", {}) if isinstance(profile, dict) else {}
+    return actions if isinstance(actions, dict) else {}
+
+
+def set_profile_voice_action(config, profile_name, command_label, *, keys=None, label=None, action_type="hotkey"):
+    updated = deepcopy(config) if isinstance(config, dict) else {}
+    profiles = updated.setdefault("profiles", {})
+    profile = profiles.setdefault(profile_name, {})
+    voice_actions = profile.setdefault("voice_actions", {})
+
+    command_key = str(command_label or "").strip()
+    if not command_key:
+        return updated
+
+    key_list = list(keys or [])
+    if not key_list:
+        voice_actions.pop(command_key, None)
+        return updated
+
+    voice_actions[command_key] = {
+        "type": action_type,
+        "keys": key_list,
+        "label": label.strip() if isinstance(label, str) and label.strip() else command_key,
+    }
+
+    updated["active_profile"] = profile_name
+    return updated
+
+
+def remove_profile_voice_action(config, profile_name, command_label):
+    updated = deepcopy(config) if isinstance(config, dict) else {}
+    profiles = updated.setdefault("profiles", {})
+    profile = profiles.setdefault(profile_name, {})
+    voice_actions = profile.setdefault("voice_actions", {})
+    command_key = str(command_label or "").strip()
+    if command_key:
+        voice_actions.pop(command_key, None)
+    updated["active_profile"] = profile_name
+    return updated
+
+
+def get_voice_control_settings(config):
+    voice_control = config.get("voice_control", {}) if isinstance(config, dict) else {}
+    return voice_control if isinstance(voice_control, dict) else {}
+
+
+def set_voice_control_settings(config, **kwargs):
+    updated = deepcopy(config) if isinstance(config, dict) else {}
+    voice_control = dict(updated.get("voice_control", {}) or {})
+    for key, value in kwargs.items():
+        voice_control[key] = value
+    updated["voice_control"] = voice_control
+    return updated
+
+
 def parse_hotkey_spec(text):
     if text is None:
         return []

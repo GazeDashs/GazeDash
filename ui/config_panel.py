@@ -71,6 +71,22 @@ def _make_slider_row(parent, key, value, minimum=0.0, maximum=1.0):
     return row, slider
 
 
+def _make_boolean_row(parent, key, value):
+    row = ctk.CTkFrame(parent, fg_color="#17202A", corner_radius=14)
+    row.grid_columnconfigure(0, weight=1)
+
+    header = ctk.CTkFrame(row, fg_color="transparent")
+    header.grid(row=0, column=0, sticky="ew", padx=14, pady=(10, 0))
+    header.grid_columnconfigure(0, weight=1)
+
+    ctk.CTkLabel(header, text=key.replace("_", " ").title(), anchor="w").grid(row=0, column=0, sticky="w")
+    var = ctk.BooleanVar(value=bool(value))
+    switch = ctk.CTkSwitch(row, text="", variable=var)
+    switch.grid(row=0, column=1, sticky="e", padx=(0, 14))
+    return row, switch, var
+
+
+
 def _format_action(action):
     if not isinstance(action, dict):
         return "Sin acción configurada"
@@ -119,6 +135,28 @@ def _make_text_entry_row(parent, label_text, value=""):
     entry.delete(0, "end")
     entry.insert(0, str(value or ""))
     return row, entry
+
+
+def _check_voice_deps() -> bool:
+    """Devuelve True si las dependencias de voz estan todas disponibles."""
+    import importlib.util
+    required = ["librosa", "sounddevice", "pandas", "xgboost"]
+    return all(importlib.util.find_spec(mod) is not None for mod in required)
+
+
+def _check_voice_models(config) -> list[str]:
+    """Devuelve lista de nombres de modelos que NO se pudieron encontrar en disco."""
+    from pathlib import Path
+    voice_cfg = config.get("voice_control", {}) if isinstance(config, dict) else {}
+    model_paths = voice_cfg.get("model_paths", {}) if isinstance(voice_cfg, dict) else {}
+    missing = []
+    for name, path in (model_paths or {}).items():
+        p = Path(path) if not Path(path).is_absolute() else Path(path)
+        if not p.exists():
+            p = Path(".") / path
+        if not p.exists():
+            missing.append(name)
+    return missing
 
 
 def open_config_panel(master=None, config_manager=None):
@@ -236,27 +274,34 @@ def open_config_panel(master=None, config_manager=None):
     thresholds_scroll.grid(row=0, column=0, sticky="nsew")
     thresholds_scroll.grid_columnconfigure(0, weight=1)
 
-    voice_card, voice_body = _section_card(right_panel, "Control de voz", "Ajusta activación, descanso y ganancia para el micrófono")
+    voice_card, voice_body = _section_card(right_panel, "Control de voz", "Activación por módulo: decí 'Web', 'Multimedia', 'Navegacion' o 'Accesibilidad'")
     voice_card.grid(row=1, column=0, sticky="ew", pady=(16, 0))
     voice_body.grid_columnconfigure(0, weight=1)
 
     voice_enabled_row, voice_enabled_switch, voice_enabled_var = _make_boolean_row(voice_body, "activar voz", False)
     voice_enabled_row.grid(row=0, column=0, sticky="ew", pady=(0, 12))
 
-    activation_gesture_row, activation_gesture_entry = _make_text_entry_row(voice_body, "Gesto de activación", "mouth_pucker")
-    activation_gesture_row.grid(row=1, column=0, sticky="ew", pady=(0, 12))
+    repeat_guard_row, repeat_guard_switch, repeat_guard_var = _make_boolean_row(voice_body, "protección anti-repetición", True)
+    repeat_guard_row.grid(row=1, column=0, sticky="ew", pady=(0, 12))
 
-    activation_word_row, activation_word_entry = _make_text_entry_row(voice_body, "Palabra activación", "activar")
-    activation_word_row.grid(row=2, column=0, sticky="ew", pady=(0, 12))
+    listen_duration_row, listen_duration_slider = _make_slider_row(voice_body, "duración escucha (seg)", 2.0, 1.0, 6.0)
+    listen_duration_row.grid(row=2, column=0, sticky="ew", pady=(0, 12))
 
-    listen_duration_row, listen_duration_slider = _make_slider_row(voice_body, "duración escucha", 10.0, 1.0, 20.0)
-    listen_duration_row.grid(row=3, column=0, sticky="ew", pady=(0, 12))
+    cooldown_row, cooldown_slider = _make_slider_row(voice_body, "cooldown (seg)", 1.5, 0.5, 10.0)
+    cooldown_row.grid(row=3, column=0, sticky="ew", pady=(0, 12))
 
-    cooldown_row, cooldown_slider = _make_slider_row(voice_body, "cooldown", 5.0, 0.0, 15.0)
-    cooldown_row.grid(row=4, column=0, sticky="ew", pady=(0, 12))
+    min_conf_row, min_conf_slider = _make_slider_row(voice_body, "confianza mínima", 0.65, 0.30, 0.99)
+    min_conf_row.grid(row=4, column=0, sticky="ew", pady=(0, 12))
 
-    gain_row, gain_slider = _make_slider_row(voice_body, "ganancia", 1.0, 1.0, 10.0)
+    gain_row, gain_slider = _make_slider_row(voice_body, "ganancia micrófono", 1.0, 1.0, 10.0)
     gain_row.grid(row=5, column=0, sticky="ew", pady=(0, 12))
+
+    voice_status_label = ctk.CTkLabel(voice_body, text="Estado: —", anchor="w", wraplength=380)
+    voice_status_label.grid(row=6, column=0, sticky="ew", pady=(0, 8))
+
+    voice_test_btn_row = ctk.CTkFrame(voice_body, fg_color="transparent")
+    voice_test_btn_row.grid(row=7, column=0, sticky="ew", pady=(0, 8))
+    voice_test_btn_row.grid_columnconfigure((0, 1), weight=1)
 
     mouse_card, mouse_body = _section_card(right_panel, "Mouse analógico", "Ajusta la zona muerta, la velocidad y la calibración por perfil")
     mouse_card.grid(row=2, column=0, sticky="ew", pady=(16, 0))
@@ -307,20 +352,6 @@ def open_config_panel(master=None, config_manager=None):
         textbox.insert("1.0", text)
         textbox.configure(state="disabled")
 
-    def _make_boolean_row(parent, key, value):
-        row = ctk.CTkFrame(parent, fg_color="#17202A", corner_radius=14)
-        row.grid_columnconfigure(0, weight=1)
-
-        header = ctk.CTkFrame(row, fg_color="transparent")
-        header.grid(row=0, column=0, sticky="ew", padx=14, pady=(10, 0))
-        header.grid_columnconfigure(0, weight=1)
-
-        ctk.CTkLabel(header, text=key.replace("_", " ").title(), anchor="w").grid(row=0, column=0, sticky="w")
-        var = ctk.BooleanVar(value=bool(value))
-        switch = ctk.CTkSwitch(row, text="", variable=var)
-        switch.grid(row=0, column=1, sticky="e", padx=(0, 14))
-        return row, switch, var
-
     def build_threshold_widgets(profile_name):
         for child in thresholds_scroll.winfo_children():
             child.destroy()
@@ -363,13 +394,18 @@ def open_config_panel(master=None, config_manager=None):
     def refresh_voice_settings(profile_name=None):
         voice_config = get_voice_control_settings(current_config())
         voice_enabled_var.set(bool(voice_config.get("enabled", False)))
-        activation_gesture_entry.delete(0, "end")
-        activation_gesture_entry.insert(0, voice_config.get("activation_gesture", "mouth_pucker"))
-        activation_word_entry.delete(0, "end")
-        activation_word_entry.insert(0, voice_config.get("activation_word", "activar"))
-        listen_duration_slider.set(float(voice_config.get("listen_duration", 10.0)))
-        cooldown_slider.set(float(voice_config.get("cooldown_seconds", 5.0)))
+        repeat_guard_var.set(bool(voice_config.get("repeat_guard_enabled", True)))
+        listen_duration_slider.set(float(voice_config.get("listen_duration", 2.0)))
+        cooldown_slider.set(float(voice_config.get("cooldown_seconds", 1.5)))
+        min_conf_slider.set(float(voice_config.get("min_confidence", 0.65)))
         gain_slider.set(float(voice_config.get("gain", 1.0)))
+
+        # Aviso de estado: dependencias y modelos
+        deps_ok = _check_voice_deps()
+        if not deps_ok:
+            voice_status_label.configure(text="⚠ Faltan dependencias: instala librosa, sounddevice, pandas, xgboost", text_color="#F59E0B")
+        else:
+            voice_status_label.configure(text="✓ Dependencias OK. Habilitá la voz y guardá para activar.", text_color="#6EE7B7")
 
         voice_actions = get_profile_voice_actions(current_config(), profile_name or current_profile_name())
         set_textbox_value(voice_actions_box, _render_voice_actions(voice_actions))
@@ -509,10 +545,10 @@ def open_config_panel(master=None, config_manager=None):
         updated = set_voice_control_settings(
             updated,
             enabled=bool(voice_enabled_var.get()),
-            activation_gesture=activation_gesture_entry.get().strip(),
-            activation_word=activation_word_entry.get().strip(),
+            repeat_guard_enabled=bool(repeat_guard_var.get()),
             listen_duration=float(listen_duration_slider.get()),
             cooldown_seconds=float(cooldown_slider.get()),
+            min_confidence=float(min_conf_slider.get()),
             gain=float(gain_slider.get()),
         )
 
@@ -543,6 +579,44 @@ def open_config_panel(master=None, config_manager=None):
         refresh_all(selected_profile)
         messagebox.showinfo("GazeDash", "Configuracion guardada correctamente.")
 
+    def test_mic():
+        import threading
+
+        def _run():
+            try:
+                import sounddevice as sd
+                import numpy as np
+                voice_status_label.configure(text="🎙 Grabando 2 segundos...", text_color="#93C5FD")
+                audio = sd.rec(int(2 * 16000), samplerate=16000, channels=1, dtype="float32")
+                sd.wait()
+                peak = float(np.max(np.abs(audio)))
+                if peak < 0.01:
+                    msg = f"⚠ Micrófono muy silencioso (pico={peak:.4f}). Acercate o subí la ganancia."
+                    color = "#F59E0B"
+                else:
+                    msg = f"✓ Micrófono OK (pico={peak:.4f})"
+                    color = "#6EE7B7"
+                voice_status_label.configure(text=msg, text_color=color)
+            except ImportError:
+                voice_status_label.configure(text="⚠ sounddevice no instalado", text_color="#F87171")
+            except Exception as exc:
+                voice_status_label.configure(text=f"⚠ Error de micrófono: {exc}", text_color="#F87171")
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def show_model_status():
+        missing = _check_voice_models(current_config())
+        if missing:
+            voice_status_label.configure(
+                text=f"⚠ Modelos faltantes: {', '.join(missing)}",
+                text_color="#F59E0B",
+            )
+        else:
+            voice_status_label.configure(
+                text="✓ Todos los modelos encontrados en disco.",
+                text_color="#6EE7B7",
+            )
+
     create_button(new_profile_row, "Crear perfil", create_profile).grid(row=0, column=2, sticky="e", padx=(12, 0))
     create_button(binding_buttons, "Guardar gesto", save_binding).grid(row=0, column=0, sticky="ew", padx=(0, 6))
     create_button(binding_buttons, "Eliminar gesto", delete_binding).grid(row=0, column=1, sticky="ew", padx=6)
@@ -550,6 +624,8 @@ def open_config_panel(master=None, config_manager=None):
     create_button(voice_buttons, "Guardar voz", save_voice_binding).grid(row=0, column=0, sticky="ew", padx=(0, 6))
     create_button(voice_buttons, "Eliminar voz", delete_voice_binding).grid(row=0, column=1, sticky="ew", padx=6)
     create_button(voice_buttons, "Recargar", lambda: refresh_all(current_profile_name())).grid(row=0, column=2, sticky="ew", padx=(6, 0))
+    create_button(voice_test_btn_row, "Probar micrófono", test_mic).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+    create_button(voice_test_btn_row, "Ver modelos", show_model_status).grid(row=0, column=1, sticky="ew", padx=(6, 0))
     create_button(footer, "Guardar todo", save_all).grid(row=0, column=0, sticky="ew", padx=(18, 8), pady=18)
     create_button(footer, "Cerrar", window.destroy).grid(row=0, column=1, sticky="ew", padx=(8, 18), pady=18)
 

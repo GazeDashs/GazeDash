@@ -38,20 +38,36 @@ class HotkeyExecutor:
     def can_execute(self, action: Optional[Dict[str, Any]]) -> bool:
         if not action or not isinstance(action, dict):
             return False
-        return action.get("type") == "hotkey" and bool(action.get("keys"))
+        action_type = action.get("type")
+        if action_type == "hotkey":
+            return bool(action.get("keys"))
+        if action_type in {"mouse_click", "mouse_double_click"}:
+            return True
+        return False
 
     def execute(self, action: Optional[Dict[str, Any]]) -> bool:
-        """Ejecuta una accion de hotkey y devuelve True si se disparo."""
+        """Ejecuta una accion de entrada y devuelve True si se disparo."""
         if not self.can_execute(action):
             return False
+
+        action_type = action.get("type")
+        pyautogui = self._get_pyautogui()
+
+        if action_type == "mouse_click":
+            pyautogui.click(button=str(action.get("button") or "left"))
+            return True
+
+        if action_type == "mouse_double_click":
+            pyautogui.doubleClick(button=str(action.get("button") or "left"))
+            return True
 
         keys = self._normalize_keys(action.get("keys") if isinstance(action, dict) else None)
         if not keys:
             return False
 
-        pyautogui = self._get_pyautogui()
-        if len(tuple(keys)) == 1:
-            pyautogui.press(next(iter(keys)))
+        key_list = tuple(keys)
+        if len(key_list) == 1:
+            pyautogui.press(key_list[0])
         else:
-            pyautogui.hotkey(*keys)
+            pyautogui.hotkey(*key_list)
         return True

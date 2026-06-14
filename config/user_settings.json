@@ -4,7 +4,7 @@
   "gesture_cooldown": 0.5,
   "camera_index": 0,
   "voice_control": {
-    "enabled": true,
+    "enabled": false,
     "activation_gesture": "",
     "activation_word": "",
     "listen_duration": 2.0,
@@ -418,13 +418,13 @@
         }
       },
       "mouse_settings": {
-        "enabled": false,
+        "enabled": true,
         "dead_zone": 7.41106719367589,
         "max_speed": 100.0,
         "smoothing": 0.1600790513833992,
         "center": [
-          353.0,
-          197.0
+          321.0,
+          254.0
         ]
       }
     }

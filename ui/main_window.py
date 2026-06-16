@@ -1609,7 +1609,7 @@ class GazeDashApp(ctk.CTk):
 
     # ── Preview update ────────────────────────────────────────────────────────
 
-    def _update_preview_widgets(self, photo, detected_gesture, face_data=None):
+    def _update_preview_widgets(self, photo, detected_gesture, face_data=None, mini_photo=None):
         self._preview_image        = photo
         self._last_detected_gesture = detected_gesture
 
@@ -1655,8 +1655,10 @@ class GazeDashApp(ctk.CTk):
 
         # Mini overlay
         if self._mini_overlay is not None and self._mini_overlay.winfo_exists():
+            _mp = mini_photo if mini_photo is not None else photo
+            self._mini_preview_image = _mp   # mantener referencia
             if hasattr(self, "mini_preview_label"):
-                self.mini_preview_label.configure(image=photo, text="")
+                self.mini_preview_label.configure(image=_mp, text="")
             if hasattr(self, "mini_gesture_label"):
                 self.mini_gesture_label.configure(text=detected_gesture or "Sin gesto")
 
@@ -1673,6 +1675,113 @@ class GazeDashApp(ctk.CTk):
         if 45  <= angle < 135:  return "sur"
         if angle >= 135 or angle < -135: return "oeste"
         return "norte"
+
+    def _draw_joystick_hud(self, frame):
+        """Dibuja un HUD estilo joystick analógico sobre el frame BGR.
+
+        Muestra:
+        - Anillo exterior (rango máximo de movimiento)
+        - Círculo de zona muerta (centro)
+        - Línea del centro al punto actual de la nariz
+        - Punto coloreado según intensidad (verde→amarillo→rojo)
+        - Etiqueta de dirección
+        """
+        import numpy as np
+
+        h, w = frame.shape[:2]
+        # Posición del HUD: esquina inferior izquierda del video
+        hud_cx = 68
+        hud_cy = h - 68
+        dead_r  = 18   # radio zona muerta (px en HUD)
+        outer_r = 52   # radio del anillo exterior (rango máximo)
+
+        # ── Overlay semitransparente ──────────────────────────────────────────
+        overlay = frame.copy()
+
+        # Anillo exterior (rango)  — colores en RGB
+        cv2.circle(overlay, (hud_cx, hud_cy), outer_r, (40, 40, 40), -1)       # fondo oscuro
+        cv2.circle(overlay, (hud_cx, hud_cy), outer_r, (80, 80, 80), 2)        # borde gris
+        # Zona muerta
+        cv2.circle(overlay, (hud_cx, hud_cy), dead_r, (16, 185, 129), -1)     # verde #10B981 relleno
+        cv2.circle(overlay, (hud_cx, hud_cy), dead_r, (52, 211, 153), 2)      # borde verde claro
+
+        # Cruces de referencia
+        lc = (90, 90, 90)
+        cv2.line(overlay, (hud_cx - outer_r, hud_cy), (hud_cx + outer_r, hud_cy), lc, 1)
+        cv2.line(overlay, (hud_cx, hud_cy - outer_r), (hud_cx, hud_cy + outer_r), lc, 1)
+
+        # Fusionar con alpha
+        cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
+
+        # ── Posición de la nariz ──────────────────────────────────────────────
+        nose = self._last_nose_tip
+        center = self._nose_center
+
+        if nose is None or center is None:
+            # Sin calibrar — aviso
+            cv2.putText(
+                frame, "Recalibrar",
+                (hud_cx - outer_r + 4, hud_cy + outer_r + 14),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.38, (245, 158, 11), 1, cv2.LINE_AA,
+            )
+            return
+
+        nx_raw, ny_raw = nose
+        cx_raw, cy_raw = center
+
+        # Distancia real en px de cámara
+        rdx = nx_raw - cx_raw
+        rdy = ny_raw - cy_raw
+        dist = math.hypot(rdx, rdy)
+
+        # Escalar al HUD: max_speed en config → outer_r en HUD
+        max_dist = float(getattr(self._mouse_controller, "max_speed", 35)) or 35
+        scale = outer_r / max(max_dist, 1)
+        hx = int(hud_cx + rdx * scale)
+        hy = int(hud_cy + rdy * scale)
+
+        # Clampear al círculo exterior
+        ddx, ddy = hx - hud_cx, hy - hud_cy
+        if math.hypot(ddx, ddy) > outer_r:
+            ang = math.atan2(ddy, ddx)
+            hx = hud_cx + int(math.cos(ang) * outer_r)
+            hy = hud_cy + int(math.sin(ang) * outer_r)
+
+        # ── Color según intensidad en RGB: verde → amarillo → rojo ────────────
+        ratio = min(dist / max(max_dist, 1), 1.0)
+        if ratio < 0.5:
+            # verde puro → amarillo: R sube 0→220, G fijo en 210
+            rc = int(ratio * 2 * 220)
+            gc = 210
+        else:
+            # amarillo → rojo: R fijo en 220, G baja 210→0
+            rc = 220
+            gc = int((1.0 - (ratio - 0.5) * 2) * 210)
+        dot_color = (rc, gc, 0)   # RGB — sin canal azul
+
+        # Línea de dirección (desde centro hasta el punto)
+        if math.hypot(ddx, ddy) > dead_r:
+            cv2.line(frame, (hud_cx, hud_cy), (hx, hy), dot_color, 2, cv2.LINE_AA)
+
+        # Punto de posición
+        cv2.circle(frame, (hx, hy), 7, dot_color, -1, cv2.LINE_AA)
+        cv2.circle(frame, (hx, hy), 7, (255, 255, 255), 1, cv2.LINE_AA)  # borde blanco
+
+        # Punto central fijo
+        cv2.circle(frame, (hud_cx, hud_cy), 3, (200, 200, 200), -1, cv2.LINE_AA)
+
+        # ── Etiqueta de dirección ─────────────────────────────────────────────
+        direction = self._direction(rdx, rdy)
+        dir_icons = {
+            "norte": "▲", "sur": "▼", "este": "▶", "oeste": "◀", "centro": "●"
+        }
+        label = dir_icons.get(direction, direction)
+        cv2.putText(
+            frame, label,
+            (hud_cx - outer_r, hud_cy + outer_r + 14),
+            cv2.FONT_HERSHEY_SIMPLEX, 0.42,
+            (220, 220, 220), 1, cv2.LINE_AA,
+        )
 
     # ── Camera loop ───────────────────────────────────────────────────────────
 
@@ -1745,13 +1854,27 @@ class GazeDashApp(ctk.CTk):
                     continue
 
                 rgb   = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                # HUD joystick sobre el frame principal
+                try:
+                    self._draw_joystick_hud(rgb)
+                except Exception:
+                    pass
                 photo = ImageTk.PhotoImage(image=Image.fromarray(rgb))
-                fd    = dict(face_data) if face_data else {}
+
+                # Mini photo redimensionado (240×180) para el overlay
+                # El HUD ya está dibujado en rgb — sólo redimensionar, no redibujar
+                try:
+                    mini_rgb = cv2.resize(rgb, (240, 180))
+                    mini_photo = ImageTk.PhotoImage(image=Image.fromarray(mini_rgb))
+                except Exception:
+                    mini_photo = photo
+
+                fd = dict(face_data) if face_data else {}
 
                 self.after(
                     0,
-                    lambda p=photo, g=detected_gesture, f=fd:
-                        self._update_preview_widgets(p, g, f),
+                    lambda p=photo, mp=mini_photo, g=detected_gesture, f=fd:
+                        self._update_preview_widgets(p, g, f, mp),
                 )
 
         self._preview_thread = threading.Thread(target=worker, daemon=True)
@@ -1808,7 +1931,7 @@ class GazeDashApp(ctk.CTk):
 
         ov = ctk.CTkToplevel(self)
         ov.overrideredirect(True)
-        ov.geometry("280x350+24+24")
+        ov.geometry("280x430+24+24")   # más alto para los toggles
         ov.attributes("-topmost", True)
         ov.configure(fg_color=SIDEBAR_BG)
 
@@ -1891,9 +2014,73 @@ class GazeDashApp(ctk.CTk):
         self._mini_voice_mod_lbl.grid(row=0, column=1, sticky="e")
         bind_drag(voice_card_ov, vc_top)
 
+        # ── Fila de toggles: Mouse + Voz ────────────────────────────────────────
+        tog_row = ctk.CTkFrame(cont, fg_color="transparent")
+        tog_row.grid(row=4, column=0, sticky="ew", padx=8, pady=(2, 4))
+        tog_row.grid_columnconfigure((0, 1), weight=1)
+
+        # Toggle mouse — 1 fila: icono | texto | switch
+        mc = ctk.CTkFrame(tog_row, fg_color=CARD, corner_radius=8)
+        mc.grid(row=0, column=0, sticky="ew", padx=(0, 3))
+        mc.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            mc, text="◉", font=("Segoe UI", 20, "bold"), text_color=GREEN_TXT, width=28,
+        ).grid(row=0, column=0, padx=(8, 2), pady=8)
+        ctk.CTkLabel(
+            mc, text="Mouse", font=("Segoe UI", 10), text_color=TEXT2, anchor="w",
+        ).grid(row=0, column=1, sticky="w", padx=(0, 2), pady=8)
+
+        _mini_mouse_var = ctk.BooleanVar(value=bool(self._analog_mouse_enabled))
+
+        def _toggle_mini_mouse(var=_mini_mouse_var):
+            pname = get_active_profile_name(self._config)
+            ms_now = get_profile_mouse_settings(self._config, pname)
+            ms_now["enabled"] = bool(var.get())
+            updated = set_profile_mouse_settings(self._config, pname, ms_now)
+            save_config(updated)
+            self._config = updated
+            self._load_mouse_settings()
+            self.refresh_state()
+
+        ctk.CTkSwitch(
+            mc, text="", variable=_mini_mouse_var, width=36,
+            button_color=GREEN, progress_color=GREEN_DIM,
+            command=_toggle_mini_mouse,
+        ).grid(row=0, column=2, padx=6, pady=8)
+
+        # Toggle voz — 1 fila: icono | texto | switch
+        vc2 = ctk.CTkFrame(tog_row, fg_color=CARD, corner_radius=8)
+        vc2.grid(row=0, column=1, sticky="ew", padx=(3, 0))
+        vc2.grid_columnconfigure(1, weight=1)
+
+        ctk.CTkLabel(
+            vc2, text="♫", font=("Segoe UI", 20, "bold"), text_color=GREEN_TXT, width=28,
+        ).grid(row=0, column=0, padx=(8, 2), pady=8)
+        ctk.CTkLabel(
+            vc2, text="Voz", font=("Segoe UI", 10), text_color=TEXT2, anchor="w",
+        ).grid(row=0, column=1, sticky="w", padx=(0, 2), pady=8)
+
+        _mini_voice_var = ctk.BooleanVar(
+            value=bool(get_voice_control_settings(self._config).get("enabled", False))
+        )
+
+        def _toggle_mini_voice(var=_mini_voice_var):
+            updated = set_voice_control_settings(self._config, enabled=bool(var.get()))
+            save_config(updated)
+            self._config = updated
+            self._voice_controller.update_config(updated)
+            self.refresh_state()
+
+        ctk.CTkSwitch(
+            vc2, text="", variable=_mini_voice_var, width=36,
+            button_color=GREEN, progress_color=GREEN_DIM,
+            command=_toggle_mini_voice,
+        ).grid(row=0, column=2, padx=6, pady=8)
+
         # Buttons
         fbr = ctk.CTkFrame(cont, fg_color="transparent")
-        fbr.grid(row=4, column=0, sticky="ew", padx=8, pady=(0, 8))
+        fbr.grid(row=5, column=0, sticky="ew", padx=8, pady=(0, 8))
         fbr.grid_columnconfigure((0, 1), weight=1)
         ctk.CTkButton(fbr, text="↺", width=38,
                       fg_color=CARD, text_color=TEXT, hover_color=CARD_IN,

@@ -418,13 +418,13 @@
         }
       },
       "mouse_settings": {
-        "enabled": true,
+        "enabled": false,
         "dead_zone": 7.41106719367589,
         "max_speed": 100.0,
         "smoothing": 0.1600790513833992,
         "center": [
-          321.0,
-          254.0
+          274.0,
+          319.0
         ]
       }
     }

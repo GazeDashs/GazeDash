@@ -4,13 +4,20 @@
   "gesture_cooldown": 0.5,
   "camera_index": 0,
   "voice_control": {
-    "enabled": true,
-    "activation_gesture": "mouth_pucker",
-    "activation_word": "activar",
-    "listen_duration": 10,
-    "cooldown_seconds": 5,
+    "enabled": false,
+    "activation_gesture": "",
+    "activation_word": "",
+    "listen_duration": 2.0,
+    "cooldown_seconds": 1.5,
     "sample_rate": 16000,
+    "gain": 7.876712328767123,
+    "min_confidence": 0.65,
+    "active_module": null,
+    "repeat_guard_enabled": true,
+    "dangerous_confirmation_enabled": true,
+    "logs_enabled": true,
     "model_paths": {
+      "activacion": "assets/models/modelos_v2/Activacion__pipeline.pkl",
       "accesibilidad": "assets/models/modelos_v2/Accesibilidad__pipeline.pkl",
       "web": "assets/models/modelos_v2/Web__pipeline.pkl",
       "navegacion": "assets/models/modelos_v2/Navegacion__pipeline.pkl",
@@ -18,24 +25,19 @@
     },
     "command_actions": {
       "Click": {
-        "type": "hotkey",
-        "keys": [
-          "enter"
-        ],
+        "type": "mouse_click",
+        "button": "left",
         "label": "Click"
       },
       "Doble": {
-        "type": "hotkey",
-        "keys": [
-          "enter",
-          "enter"
-        ],
+        "type": "mouse_double_click",
+        "button": "left",
         "label": "Doble clic"
       },
       "Seleccionar": {
         "type": "hotkey",
         "keys": [
-          "space"
+          "enter"
         ],
         "label": "Seleccionar"
       },
@@ -63,7 +65,7 @@
         ],
         "label": "Nueva pestaña"
       },
-      "Recarga": {
+      "Recargar": {
         "type": "hotkey",
         "keys": [
           "ctrl",
@@ -74,7 +76,7 @@
       "Bajar": {
         "type": "hotkey",
         "keys": [
-          "pagedown"
+          "down"
         ],
         "label": "Bajar"
       },
@@ -84,47 +86,48 @@
           "alt",
           "f4"
         ],
-        "label": "Cerrar"
+        "label": "Cerrar",
+        "requires_confirmation": true
       },
       "Menu": {
         "type": "hotkey",
         "keys": [
-          "alt"
+          "winleft"
         ],
         "label": "Menu"
       },
       "Subir": {
         "type": "hotkey",
         "keys": [
-          "pageup"
+          "up"
         ],
         "label": "Subir"
       },
       "Anterior": {
         "type": "hotkey",
         "keys": [
-          "left"
+          "prevtrack"
         ],
         "label": "Anterior"
       },
       "Pausa": {
         "type": "hotkey",
         "keys": [
-          "space"
+          "playpause"
         ],
         "label": "Pausa"
       },
       "Play": {
         "type": "hotkey",
         "keys": [
-          "space"
+          "playpause"
         ],
         "label": "Play"
       },
       "Siguiente": {
         "type": "hotkey",
         "keys": [
-          "right"
+          "nexttrack"
         ],
         "label": "Siguiente"
       }
@@ -273,24 +276,19 @@
       },
       "voice_actions": {
         "Click": {
-          "type": "hotkey",
-          "keys": [
-            "enter"
-          ],
+          "type": "mouse_click",
+          "button": "left",
           "label": "Click"
         },
         "Doble": {
-          "type": "hotkey",
-          "keys": [
-            "enter",
-            "enter"
-          ],
+          "type": "mouse_double_click",
+          "button": "left",
           "label": "Doble clic"
         },
         "Seleccionar": {
           "type": "hotkey",
           "keys": [
-            "space"
+            "enter"
           ],
           "label": "Seleccionar"
         },
@@ -318,7 +316,7 @@
           ],
           "label": "Nueva pestaña"
         },
-        "Recarga": {
+        "Recargar": {
           "type": "hotkey",
           "keys": [
             "ctrl",
@@ -329,7 +327,7 @@
         "Bajar": {
           "type": "hotkey",
           "keys": [
-            "pagedown"
+            "down"
           ],
           "label": "Bajar"
         },
@@ -339,47 +337,48 @@
             "alt",
             "f4"
           ],
-          "label": "Cerrar"
+          "label": "Cerrar",
+          "requires_confirmation": true
         },
         "Menu": {
           "type": "hotkey",
           "keys": [
-            "alt"
+            "winleft"
           ],
           "label": "Menu"
         },
         "Subir": {
           "type": "hotkey",
           "keys": [
-            "pageup"
+            "up"
           ],
           "label": "Subir"
         },
         "Anterior": {
           "type": "hotkey",
           "keys": [
-            "left"
+            "prevtrack"
           ],
           "label": "Anterior"
         },
         "Pausa": {
           "type": "hotkey",
           "keys": [
-            "space"
+            "playpause"
           ],
           "label": "Pausa"
         },
         "Play": {
           "type": "hotkey",
           "keys": [
-            "space"
+            "playpause"
           ],
           "label": "Play"
         },
         "Siguiente": {
           "type": "hotkey",
           "keys": [
-            "right"
+            "nexttrack"
           ],
           "label": "Siguiente"
         }
@@ -424,8 +423,8 @@
         "max_speed": 100.0,
         "smoothing": 0.1600790513833992,
         "center": [
-          353.0,
-          197.0
+          274.0,
+          319.0
         ]
       }
     }

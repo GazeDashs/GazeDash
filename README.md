@@ -143,6 +143,10 @@ La configuración base está en `config/default_config.json`:
 ```json
 "gesture_arbitration": {
   "enabled": true,
+  "mode": "realtime",
+  "realtime_confidence": 0.85,
+  "realtime_margin": 0.15,
+  "realtime_action_types": ["hotkey", "key_hold"],
   "activation_frames": 2,
   "hold_activation_frames": 1,
   "release_frames": 2,
@@ -157,13 +161,31 @@ La configuración base está en `config/default_config.json`:
 }
 ```
 
+`mode` puede ser:
+
+- `realtime`: usa `gesture_scores.active_raw` cuando una acción de teclado supera `realtime_confidence` y `realtime_margin`. Reduce latencia para juegos y controles rápidos.
+- `balanced`: espera los booleanos estabilizados del detector y prioriza precisión.
+
+En `realtime`, los clics de mouse no usan el camino rápido por seguridad. Solo entran los tipos listados en `realtime_action_types`.
+
 Reglas prácticas para ajustar:
 
 - Si un gesto se activa por accidente, subir su `activation_frames_by_gesture`.
 - Si un gesto se corta por ruido, subir su `release_frames_by_gesture`.
 - Si un gesto se siente lento, bajar sus frames, pero hacerlo de a 1.
+- Si un juego necesita respuesta inmediata, usar `mode: "realtime"` y ajustar `realtime_confidence` entre `0.80` y `0.95`.
+- Si hay falsos positivos en realtime, subir `realtime_confidence` o `realtime_margin`, o volver a `mode: "balanced"`.
 - Para juegos simples, mantener `hold_activation_frames` y `hold_release_frames` bajos para no agregar latencia.
 - Si dos gestos se confunden dentro de un grupo, ajustar `priorities` o directamente quitar acción al gesto menos confiable en ese perfil.
+
+### Modo de acción por gesto
+
+En **Configuración → Gestos → Acciones**, cada gesto con teclas puede usar dos modos:
+
+- Switch `mantener` apagado: guarda `type: "hotkey"` y pulsa la tecla una vez por activación.
+- Switch `mantener` encendido: guarda `type: "key_hold"` y mantiene la tecla presionada mientras el gesto siga activo.
+
+Esto permite perfiles de juego más precisos. Por ejemplo, un juego de menú o grilla puede usar flechas como `hotkey` para avanzar una celda por gesto, mientras que un juego de movimiento continuo puede usar `key_hold` para caminar mientras se sostiene el gesto.
 
 ### Diagnóstico en vivo
 

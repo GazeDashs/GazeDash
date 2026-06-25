@@ -716,11 +716,11 @@ class GazeDashApp(ctk.CTk):
         hdr = ctk.CTkFrame(scroller_g, fg_color="transparent")
         hdr.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         hdr.grid_columnconfigure(1, weight=1)
-        for col, txt in enumerate(["GESTO", "ACCIÓN", "UMBRAL", "ESTADO"]):
+        for col, txt in enumerate(["GESTO", "ACCIÓN", "MODO", "UMBRAL", "ESTADO"]):
             _lbl(hdr, txt, 9, color=TEXT3).grid(row=0, column=col, sticky="w",
                 padx=(0 if col == 0 else 8, 0))
 
-        self._gesture_row_widgets = {}  # gesture_name -> (keys_entry, slider, switch_var, action_type)
+        self._gesture_row_widgets = {}  # gesture_name -> (keys_entry, slider, switch_var, action_type, hold_var)
 
         def build_gesture_rows(profile_name):
             for w in scroller_g.winfo_children():
@@ -751,23 +751,38 @@ class GazeDashApp(ctk.CTk):
                 action_entry.insert(0, keys_str)
                 action_entry.grid(row=0, column=2, padx=4)
 
+                # Action mode: tap once or hold while gesture remains active.
+                hold_var = ctk.BooleanVar(value=action_type == "key_hold")
+                hold_sw = ctk.CTkSwitch(
+                    row,
+                    text="mantener",
+                    variable=hold_var,
+                    button_color=GREEN,
+                    progress_color=GREEN_DIM,
+                    width=70,
+                    font=("Segoe UI", 10),
+                )
+                hold_sw.grid(row=0, column=3, padx=4)
+                if action_type in {"mouse_click", "mouse_double_click"}:
+                    hold_sw.configure(state="disabled")
+
                 # Threshold slider
                 thr_var = ctk.StringVar(value=f"{threshold:.1f}")
                 sl = ctk.CTkSlider(row, from_=0.0, to=1.0, width=80,
                                    button_color=GREEN, progress_color=GREEN, fg_color=CARD_IN)
                 sl.set(threshold)
                 sl.configure(command=lambda v, tv=thr_var: tv.set(f"{v:.1f}"))
-                sl.grid(row=0, column=3, padx=4)
+                sl.grid(row=0, column=4, padx=4)
                 ctk.CTkLabel(row, textvariable=thr_var, width=28,
-                             font=("Segoe UI", 11), text_color=GREEN_TXT).grid(row=0, column=4, padx=(0, 4))
+                             font=("Segoe UI", 11), text_color=GREEN_TXT).grid(row=0, column=5, padx=(0, 4))
 
                 # Enable toggle
                 sw_var = ctk.BooleanVar(value=bool(action))
                 sw = ctk.CTkSwitch(row, text="", variable=sw_var,
                                    button_color=GREEN, progress_color=GREEN_DIM, width=44)
-                sw.grid(row=0, column=5, padx=(4, 10))
+                sw.grid(row=0, column=6, padx=(4, 10))
 
-                self._gesture_row_widgets[gname] = (action_entry, sl, sw_var, action_type)
+                self._gesture_row_widgets[gname] = (action_entry, sl, sw_var, action_type, hold_var)
 
             # Save row
             save_row = ctk.CTkFrame(scroller_g, fg_color="transparent")
@@ -789,7 +804,7 @@ class GazeDashApp(ctk.CTk):
         def save_gestures(profile_name):
             updated = cfg_state["config"]
             thr_payload = {}
-            for gname, (entry, sl, sw_var, action_type) in self._gesture_row_widgets.items():
+            for gname, (entry, sl, sw_var, action_type, hold_var) in self._gesture_row_widgets.items():
                 keys_raw = entry.get().strip()
                 if sw_var.get() and action_type in {"mouse_click", "mouse_double_click"}:
                     updated = set_profile_gesture_action(
@@ -803,13 +818,14 @@ class GazeDashApp(ctk.CTk):
                 elif keys_raw and sw_var.get():
                     keys = parse_hotkey_spec(keys_raw)
                     if keys:
+                        selected_action_type = "key_hold" if bool(hold_var.get()) else "hotkey"
                         updated = set_profile_gesture_action(
                             updated,
                             profile_name,
                             gname,
                             keys=keys,
                             label=gname,
-                            action_type=action_type,
+                            action_type=selected_action_type,
                         )
                 else:
                     updated = remove_profile_gesture_action(updated, profile_name, gname)

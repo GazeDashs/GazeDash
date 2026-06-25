@@ -137,6 +137,10 @@ class GestureArbiterTests(unittest.TestCase):
         arbiter = GestureArbiter.from_config(
             {
                 "gesture_arbitration": {
+                    "mode": "realtime",
+                    "realtime_confidence": 0.9,
+                    "realtime_margin": 0.25,
+                    "realtime_action_types": ["hotkey"],
                     "activation_frames": 1,
                     "release_frames": 1,
                     "activation_frames_by_gesture": {"mouth_o": 4},
@@ -149,6 +153,15 @@ class GestureArbiterTests(unittest.TestCase):
         self.assertEqual(arbiter.activation_frames_by_gesture["mouth_o"], 4)
         self.assertEqual(arbiter.release_frames_by_gesture["mouth_o"], 3)
         self.assertEqual(arbiter.priorities["mouth_open"], 99)
+        self.assertEqual(arbiter.mode, "realtime")
+        self.assertEqual(arbiter.realtime_confidence, 0.9)
+        self.assertEqual(arbiter.realtime_margin, 0.25)
+        self.assertEqual(arbiter.realtime_action_types, ("hotkey",))
+
+    def test_from_config_defaults_to_realtime_mode(self):
+        arbiter = GestureArbiter.from_config({})
+
+        self.assertEqual(arbiter.mode, "realtime")
 
     def test_debug_records_candidates_and_rejections(self):
         arbiter = GestureArbiter(activation_frames=1)
@@ -209,6 +222,56 @@ class GestureArbiterTests(unittest.TestCase):
         self.assertFalse(filtered["mouth_o"])
         self.assertEqual(arbiter.last_debug["groups"]["mouth"]["candidate"], "mouth_open")
         self.assertEqual(arbiter.last_debug["groups"]["mouth"]["scores"]["mouth_open"]["confidence"], 0.95)
+
+    def test_realtime_mode_uses_high_confidence_raw_keyboard_action(self):
+        arbiter = GestureArbiter(mode="realtime", activation_frames=3, realtime_confidence=0.85, realtime_margin=0.15)
+        gestures = {
+            "has_face": True,
+            "calibrating": False,
+            "calibration_progress": 1.0,
+            "smile_right": False,
+            "gesture_scores": {
+                "smile_right": {
+                    "active_raw": True,
+                    "confidence": 0.96,
+                    "margin": 0.3,
+                    "score": 1.3,
+                }
+            },
+        }
+
+        filtered = arbiter.filter(
+            gestures,
+            action_resolver=lambda name: {"type": "hotkey", "keys": ["right"]} if name == "smile_right" else None,
+        )
+
+        self.assertTrue(filtered["smile_right"])
+        self.assertEqual(arbiter.last_debug["realtime_active"], ["smile_right"])
+
+    def test_realtime_mode_rejects_low_confidence_raw_candidate(self):
+        arbiter = GestureArbiter(mode="realtime", activation_frames=1, realtime_confidence=0.85, realtime_margin=0.15)
+        gestures = {
+            "has_face": True,
+            "calibrating": False,
+            "calibration_progress": 1.0,
+            "smile_right": False,
+            "gesture_scores": {
+                "smile_right": {
+                    "active_raw": True,
+                    "confidence": 0.7,
+                    "margin": 0.3,
+                    "score": 1.3,
+                }
+            },
+        }
+
+        filtered = arbiter.filter(
+            gestures,
+            action_resolver=lambda name: {"type": "hotkey", "keys": ["right"]} if name == "smile_right" else None,
+        )
+
+        self.assertFalse(filtered["smile_right"])
+        self.assertEqual(arbiter.last_debug["realtime_active"], [])
 
 
 if __name__ == "__main__":

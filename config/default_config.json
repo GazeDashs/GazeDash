@@ -4,6 +4,10 @@
   "gesture_cooldown": 0.5,
   "gesture_arbitration": {
     "enabled": true,
+    "mode": "realtime",
+    "realtime_confidence": 0.85,
+    "realtime_margin": 0.15,
+    "realtime_action_types": ["hotkey", "key_hold"],
     "activation_frames": 2,
     "hold_activation_frames": 1,
     "release_frames": 2,

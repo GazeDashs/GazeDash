@@ -49,6 +49,10 @@ class GestureArbiter:
     hold_activation_frames: int = 1
     release_frames: int = 2
     hold_release_frames: int = 1
+    mode: str = "realtime"
+    realtime_confidence: float = 0.85
+    realtime_margin: float = 0.15
+    realtime_action_types: tuple[str, ...] = ("hotkey", "key_hold")
     enabled: bool = True
     conflict_groups: Dict[str, tuple[str, ...]] = field(default_factory=lambda: dict(DEFAULT_CONFLICT_GROUPS))
     priorities: Dict[str, int] = field(default_factory=lambda: dict(DEFAULT_PRIORITIES))
@@ -60,12 +64,17 @@ class GestureArbiter:
         self.hold_activation_frames = max(1, int(self.hold_activation_frames))
         self.release_frames = max(1, int(self.release_frames))
         self.hold_release_frames = max(1, int(self.hold_release_frames))
+        self.mode = str(self.mode or "balanced").strip().lower()
+        self.realtime_confidence = max(0.0, min(float(self.realtime_confidence), 1.0))
+        self.realtime_margin = float(self.realtime_margin)
+        self.realtime_action_types = tuple(str(action_type) for action_type in self.realtime_action_types)
         self.activation_frames_by_gesture = self._normalize_frame_overrides(self.activation_frames_by_gesture)
         self.release_frames_by_gesture = self._normalize_frame_overrides(self.release_frames_by_gesture)
         self._candidates: dict[str, Optional[str]] = {}
         self._candidate_counts: dict[str, int] = {}
         self._release_counts: dict[str, int] = {}
         self._active_by_group: dict[str, Optional[str]] = {}
+        self._current_realtime_candidates: set[str] = set()
         self._gesture_to_group = {
             gesture_name: group_name
             for group_name, gestures in self.conflict_groups.items()
@@ -85,10 +94,24 @@ class GestureArbiter:
             hold_activation_frames=int(settings.get("hold_activation_frames", 1)),
             release_frames=int(settings.get("release_frames", 2)),
             hold_release_frames=int(settings.get("hold_release_frames", 1)),
+            mode=str(settings.get("mode", "realtime")),
+            realtime_confidence=float(settings.get("realtime_confidence", 0.85)),
+            realtime_margin=float(settings.get("realtime_margin", 0.15)),
+            realtime_action_types=cls._read_str_tuple(
+                settings.get("realtime_action_types", ("hotkey", "key_hold"))
+            ),
             priorities=cls._merge_int_mapping(DEFAULT_PRIORITIES, settings.get("priorities")),
             activation_frames_by_gesture=cls._read_int_mapping(settings.get("activation_frames_by_gesture")),
             release_frames_by_gesture=cls._read_int_mapping(settings.get("release_frames_by_gesture")),
         )
+
+    @staticmethod
+    def _read_str_tuple(value: Any) -> tuple[str, ...]:
+        if isinstance(value, str):
+            return (value,)
+        if not isinstance(value, (list, tuple)):
+            return ()
+        return tuple(str(item) for item in value if str(item).strip())
 
     @staticmethod
     def _read_int_mapping(value: Any) -> Dict[str, int]:
@@ -118,6 +141,7 @@ class GestureArbiter:
         self._candidate_counts.clear()
         self._release_counts.clear()
         self._active_by_group.clear()
+        self._current_realtime_candidates.clear()
         self.last_debug = self._empty_debug(reason="reset")
 
     def filter(
@@ -153,8 +177,11 @@ class GestureArbiter:
             }
             return filtered
 
-        active_names = self._active_gesture_names(gestures)
         gesture_scores = gestures.get("gesture_scores", {}) if isinstance(gestures.get("gesture_scores"), dict) else {}
+        active_names = self._active_gesture_names(gestures)
+        realtime_names = self._realtime_candidates(gestures, action_resolver, gesture_scores)
+        self._current_realtime_candidates = set(realtime_names)
+        active_names = list(dict.fromkeys(active_names + realtime_names))
 
         grouped: dict[str, list[str]] = {group_name: [] for group_name in self.conflict_groups}
         ungrouped = []
@@ -188,11 +215,43 @@ class GestureArbiter:
             "reason": "ok",
             "meta": {key: gestures.get(key) for key in META_KEYS if key in gestures},
             "raw_active": active_names,
+            "realtime_active": realtime_names,
             "active": filtered_active,
             "groups": debug_groups,
             "ungrouped": ungrouped,
         }
         return filtered
+
+    def _realtime_candidates(
+        self,
+        gestures: Dict[str, Any],
+        action_resolver: Optional[Callable[[str], Optional[Dict[str, Any]]]],
+        gesture_scores: Dict[str, Any],
+    ) -> list[str]:
+        if self.mode != "realtime" or action_resolver is None:
+            return []
+
+        candidates = []
+        for gesture_name, score_info in gesture_scores.items():
+            if gesture_name in META_KEYS or gestures.get(gesture_name):
+                continue
+            if not self._passes_realtime_score(score_info):
+                continue
+            action = action_resolver(gesture_name)
+            if not isinstance(action, dict):
+                continue
+            if action.get("type") not in self.realtime_action_types:
+                continue
+            candidates.append(gesture_name)
+        return candidates
+
+    def _passes_realtime_score(self, score_info: Any) -> bool:
+        if not isinstance(score_info, dict):
+            return False
+        if not bool(score_info.get("active_raw")):
+            return False
+        confidence, margin = self._score_rank_values(score_info)
+        return confidence >= self.realtime_confidence and margin >= self.realtime_margin
 
     @staticmethod
     def _empty_debug(reason: str) -> Dict[str, Any]:
@@ -200,6 +259,7 @@ class GestureArbiter:
             "reason": reason,
             "meta": {},
             "raw_active": [],
+            "realtime_active": [],
             "active": [],
             "groups": {},
             "ungrouped": [],
@@ -343,6 +403,9 @@ class GestureArbiter:
         gesture_name: str,
         action_resolver: Optional[Callable[[str], Optional[Dict[str, Any]]]],
     ) -> int:
+        if gesture_name in self._current_realtime_candidates:
+            return 1
+
         if gesture_name in self.activation_frames_by_gesture:
             return self.activation_frames_by_gesture[gesture_name]
 

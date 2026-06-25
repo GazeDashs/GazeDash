@@ -106,6 +106,7 @@ class FacialGestureDetector:
     # Minimum absolute delta above baseline required (prevents tiny baseline noise)
     MIN_ABSOLUTE_DELTAS = {
         "brow_raise": 0.04,
+        "brow_frown": 0.06,
         "mouth_pucker": 0.18,
         "eye_blink": 0.08,
     }
@@ -351,6 +352,14 @@ class FacialGestureDetector:
         # Blink only counts as a one-eye wink; simultaneous closure is ignored.
         eye_blink_active = left_eye_blink_active or right_eye_blink_active
 
+        # Detect ANY significant eye closure (unilateral or bilateral).
+        # Used to suppress brow gestures even before eye_blink passes debounce,
+        # because closing an eye physically moves browDown/browInnerUp blendshapes.
+        _any_eye_closing = (
+            left_eye_blink_delta >= blink_min_delta
+            or right_eye_blink_delta >= blink_min_delta
+        )
+
         eye_blink_score = max(
             self._ratio(left_eye_blink_delta, blink_threshold),
             self._ratio(right_eye_blink_delta, blink_threshold),
@@ -414,10 +423,11 @@ class FacialGestureDetector:
             "mouth_o": mouth_o,
             "smile_left": smile_left_score >= 1.0,
             "smile_right": smile_right_score >= 1.0,
-            # brow_raise must come from eyebrow motion, not from eyelid closure.
-            # If blink/squint is active, ignore brow_raise to avoid false positives.
-            "brow_raise": not eye_blink_active and brow_raise_score >= 1.0,
-            "brow_frown": brow_frown_score >= 1.0,
+            # brow_raise and brow_frown must come from eyebrow motion, not from
+            # eyelid closure. Suppress both when ANY eye is closing significantly,
+            # even before the blink gesture passes its debounce.
+            "brow_raise": not _any_eye_closing and brow_raise_score >= 1.0,
+            "brow_frown": not _any_eye_closing and brow_frown_score >= 1.0,
             "eye_blink": eye_blink_active,
             "eye_wide": eye_wide_score >= 1.0,
             "nose_sneer": nose_sneer_score >= 1.0,
@@ -451,6 +461,11 @@ class FacialGestureDetector:
                     delta = max(
                         metrics.get("brow_inner_up", 0.0) - self._neutral_value("brow_inner_up"),
                         metrics.get("brow_ratio", 0.0) - self._neutral_value("brow_ratio"),
+                    )
+                elif name == "brow_frown":
+                    delta = max(
+                        metrics.get("brow_down_left", 0.0) - self._neutral_value("brow_down_left"),
+                        metrics.get("brow_down_right", 0.0) - self._neutral_value("brow_down_right"),
                     )
                 elif name == "mouth_pucker":
                     delta = metrics.get("mouth_pucker_score", 0.0) - self._neutral_value("mouth_pucker_score")

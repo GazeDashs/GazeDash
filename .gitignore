@@ -20,6 +20,9 @@ build/
 dist/
 *.egg-info/
 
+# Runtime diagnostics
+logs/
+
 # Local OS/editor files
 .DS_Store
 Thumbs.db

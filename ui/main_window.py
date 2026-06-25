@@ -10,6 +10,8 @@ import customtkinter as ctk
 from PIL import Image, ImageTk
 
 from core.gesture_engine.cooldown_manager import CooldownManager
+from core.gesture_engine.gesture_arbiter import GestureArbiter
+from core.gesture_engine.gesture_diagnostics_logger import GestureDiagnosticsLogger
 from core.gesture_engine.gesture_mapper import map_gesture
 from core.gesture_engine.hotkey_executor import HotkeyExecutor
 from core.voice_control.voice_control import VoiceCommandController
@@ -109,7 +111,7 @@ def _action_button(parent, text, cmd, col=None, fg=CARD, text_col=TEXT):
 # ── Aplicación principal ──────────────────────────────────────────────────────
 
 class GazeDashApp(ctk.CTk):
-    _GESTURE_META_KEYS = {"has_face", "calibrating", "calibration_progress"}
+    _GESTURE_META_KEYS = {"has_face", "calibrating", "calibration_progress", "gesture_scores"}
     _NAV_ITEMS = [
         ("inicio",        "⌂",  "Inicio"),
         ("configuracion", "⚙",  "Configuración"),
@@ -142,6 +144,8 @@ class GazeDashApp(ctk.CTk):
         self._last_confidence = 0.0
 
         self._gesture_detector    = FacialGestureDetector()
+        self._gesture_arbiter     = GestureArbiter.from_config(self._config)
+        self._gesture_diag_logger = GestureDiagnosticsLogger.from_config(self._config, component="ui")
         self._gesture_executor    = HotkeyExecutor()
         self._voice_controller    = VoiceCommandController(
             self._config, status_callback=self._set_voice_status
@@ -218,6 +222,8 @@ class GazeDashApp(ctk.CTk):
 
     def _toggle_pause(self):
         self._controller_paused = not self._controller_paused
+        if self._controller_paused:
+            self._gesture_executor.release_all_holds()
         label = "▶  Reanudar" if self._controller_paused else "⏸  Pausar"
         if hasattr(self, "_btn_pause"):
             self._btn_pause.configure(text=label)
@@ -331,14 +337,24 @@ class GazeDashApp(ctk.CTk):
 
     def _handle_gestures(self, gestures):
         if not gestures or not gestures.get("has_face"):
+            self._gesture_executor.release_all_holds()
             return
         if gestures.get("calibrating") or self._controller_paused:
+            self._gesture_executor.release_all_holds()
             return
         for gesture_name, is_active in gestures.items():
-            if gesture_name in self._GESTURE_META_KEYS or not is_active:
+            if gesture_name in self._GESTURE_META_KEYS:
                 continue
-            action = map_gesture(gesture_name)
+            action = map_gesture(gesture_name, self._config)
             if not action:
+                continue
+            if self._gesture_executor.is_hold_action(action):
+                try:
+                    self._gesture_executor.update_hold(gesture_name, action, bool(is_active))
+                except RuntimeError:
+                    pass
+                continue
+            if not is_active:
                 continue
             cooldown_key = action.get("label") or gesture_name
             if not self._cooldown_manager.allow(cooldown_key):
@@ -532,11 +548,25 @@ class GazeDashApp(ctk.CTk):
         )
         self._active_action_label.pack(padx=14, pady=6)
 
+        # Diagnóstico de arbitraje
+        diag_card = ctk.CTkFrame(ri, fg_color=CARD, corner_radius=12)
+        diag_card.grid(row=3, column=0, sticky="ew", pady=(0, 12))
+        diag_card.grid_columnconfigure(0, weight=1)
+        _lbl(diag_card, "Diagnóstico", 10, color=TEXT3).grid(
+            row=0, column=0, sticky="w", padx=10, pady=(8, 2)
+        )
+        self._gesture_diag_winner = _lbl(diag_card, "Ganador: —", 11, color=GREEN_TXT, anchor="w")
+        self._gesture_diag_winner.grid(row=1, column=0, sticky="ew", padx=10)
+        self._gesture_diag_raw = _lbl(diag_card, "Crudos: —", 10, color=TEXT2, anchor="w", wraplength=180)
+        self._gesture_diag_raw.grid(row=2, column=0, sticky="ew", padx=10, pady=(2, 0))
+        self._gesture_diag_rejected = _lbl(diag_card, "Descartados: —", 10, color=TEXT2, anchor="w", wraplength=180)
+        self._gesture_diag_rejected.grid(row=3, column=0, sticky="ew", padx=10, pady=(2, 8))
+
         # Métricas faciales
         ctk.CTkFrame(ri, height=1, fg_color=TEXT3).grid(
-            row=3, column=0, sticky="ew", pady=(0, 8)
+            row=4, column=0, sticky="ew", pady=(0, 8)
         )
-        _section_title(ri, "Métricas faciales").grid(row=4, column=0, sticky="w", pady=(0, 6))
+        _section_title(ri, "Métricas faciales").grid(row=5, column=0, sticky="w", pady=(0, 6))
 
         self._metric_rows = {}
         facial_metrics = [
@@ -548,7 +578,7 @@ class GazeDashApp(ctk.CTk):
         ]
         for i, (display, key) in enumerate(facial_metrics):
             row = ctk.CTkFrame(ri, fg_color="transparent")
-            row.grid(row=5 + i, column=0, sticky="ew", pady=2)
+            row.grid(row=6 + i, column=0, sticky="ew", pady=2)
             row.grid_columnconfigure(0, weight=1)
             _lbl(row, display, 12, color=TEXT2).grid(row=0, column=0, sticky="w")
             val = _lbl(row, "0.00", 12, bold=True, color=GREEN_TXT)
@@ -557,16 +587,16 @@ class GazeDashApp(ctk.CTk):
 
         # Módulos
         ctk.CTkFrame(ri, height=1, fg_color=TEXT3).grid(
-            row=10, column=0, sticky="ew", pady=(8, 8)
+            row=11, column=0, sticky="ew", pady=(8, 8)
         )
-        _section_title(ri, "Módulos").grid(row=11, column=0, sticky="w", pady=(0, 6))
+        _section_title(ri, "Módulos").grid(row=12, column=0, sticky="w", pady=(0, 6))
 
         self._mod_rows = {}
         for i, (key, label) in enumerate([("gestos", "Gestos"),
                                            ("mouse",  "Mouse nariz"),
                                            ("voz",    "Voz")]):
             row = ctk.CTkFrame(ri, fg_color="transparent")
-            row.grid(row=12 + i, column=0, sticky="ew", pady=2)
+            row.grid(row=13 + i, column=0, sticky="ew", pady=2)
             row.grid_columnconfigure(0, weight=1)
             _lbl(row, label, 12, color=TEXT2).grid(row=0, column=0, sticky="w")
             dot = _lbl(row, "○ inactivo", 11, color=TEXT3)
@@ -575,13 +605,13 @@ class GazeDashApp(ctk.CTk):
 
         # ── Voz en vivo ───────────────────────────────────────────────────────
         ctk.CTkFrame(ri, height=1, fg_color=TEXT3).grid(
-            row=15, column=0, sticky="ew", pady=(8, 8)
+            row=16, column=0, sticky="ew", pady=(8, 8)
         )
-        _section_title(ri, "Voz en vivo").grid(row=16, column=0, sticky="w", pady=(0, 6))
+        _section_title(ri, "Voz en vivo").grid(row=17, column=0, sticky="w", pady=(0, 6))
 
         # Card de estado
         self._voice_status_card = ctk.CTkFrame(ri, fg_color=CARD, corner_radius=12)
-        self._voice_status_card.grid(row=17, column=0, sticky="ew", pady=(0, 6))
+        self._voice_status_card.grid(row=18, column=0, sticky="ew", pady=(0, 6))
         self._voice_status_card.grid_columnconfigure(0, weight=1)
 
         # Fila icono + estado
@@ -611,7 +641,7 @@ class GazeDashApp(ctk.CTk):
 
         # Advertencia confianza baja
         self._voice_warn_card = ctk.CTkFrame(ri, fg_color="#2D1B00", corner_radius=10)
-        self._voice_warn_card.grid(row=18, column=0, sticky="ew")
+        self._voice_warn_card.grid(row=19, column=0, sticky="ew")
         self._voice_warn_card.grid_remove()  # oculto por defecto
         self._voice_warn_card.grid_columnconfigure(0, weight=1)
         _lbl(self._voice_warn_card, "⚠  Confianza baja — repetí el comando",
@@ -686,11 +716,11 @@ class GazeDashApp(ctk.CTk):
         hdr = ctk.CTkFrame(scroller_g, fg_color="transparent")
         hdr.grid(row=0, column=0, sticky="ew", pady=(0, 8))
         hdr.grid_columnconfigure(1, weight=1)
-        for col, txt in enumerate(["GESTO", "ACCIÓN", "UMBRAL", "ESTADO"]):
+        for col, txt in enumerate(["GESTO", "ACCIÓN", "MODO", "UMBRAL", "ESTADO"]):
             _lbl(hdr, txt, 9, color=TEXT3).grid(row=0, column=col, sticky="w",
                 padx=(0 if col == 0 else 8, 0))
 
-        self._gesture_row_widgets = {}  # gesture_name -> (keys_entry, label_entry, switch_var)
+        self._gesture_row_widgets = {}  # gesture_name -> (keys_entry, slider, switch_var, action_type, hold_var)
 
         def build_gesture_rows(profile_name):
             for w in scroller_g.winfo_children():
@@ -702,6 +732,7 @@ class GazeDashApp(ctk.CTk):
             for i, gname in enumerate(AVAILABLE_GESTURE_NAMES):
                 action = actions.get(gname, {})
                 threshold = thresholds.get(gname, 0.5)
+                action_type = action.get("type", "hotkey") if isinstance(action, dict) else "hotkey"
                 row = ctk.CTkFrame(scroller_g, fg_color=CARD, corner_radius=12)
                 row.grid(row=i + 1, column=0, sticky="ew", pady=(0, 6))
                 row.grid_columnconfigure(2, weight=1)
@@ -720,23 +751,38 @@ class GazeDashApp(ctk.CTk):
                 action_entry.insert(0, keys_str)
                 action_entry.grid(row=0, column=2, padx=4)
 
+                # Action mode: tap once or hold while gesture remains active.
+                hold_var = ctk.BooleanVar(value=action_type == "key_hold")
+                hold_sw = ctk.CTkSwitch(
+                    row,
+                    text="mantener",
+                    variable=hold_var,
+                    button_color=GREEN,
+                    progress_color=GREEN_DIM,
+                    width=70,
+                    font=("Segoe UI", 10),
+                )
+                hold_sw.grid(row=0, column=3, padx=4)
+                if action_type in {"mouse_click", "mouse_double_click"}:
+                    hold_sw.configure(state="disabled")
+
                 # Threshold slider
                 thr_var = ctk.StringVar(value=f"{threshold:.1f}")
                 sl = ctk.CTkSlider(row, from_=0.0, to=1.0, width=80,
                                    button_color=GREEN, progress_color=GREEN, fg_color=CARD_IN)
                 sl.set(threshold)
                 sl.configure(command=lambda v, tv=thr_var: tv.set(f"{v:.1f}"))
-                sl.grid(row=0, column=3, padx=4)
+                sl.grid(row=0, column=4, padx=4)
                 ctk.CTkLabel(row, textvariable=thr_var, width=28,
-                             font=("Segoe UI", 11), text_color=GREEN_TXT).grid(row=0, column=4, padx=(0, 4))
+                             font=("Segoe UI", 11), text_color=GREEN_TXT).grid(row=0, column=5, padx=(0, 4))
 
                 # Enable toggle
                 sw_var = ctk.BooleanVar(value=bool(action))
                 sw = ctk.CTkSwitch(row, text="", variable=sw_var,
                                    button_color=GREEN, progress_color=GREEN_DIM, width=44)
-                sw.grid(row=0, column=5, padx=(4, 10))
+                sw.grid(row=0, column=6, padx=(4, 10))
 
-                self._gesture_row_widgets[gname] = (action_entry, sl, sw_var)
+                self._gesture_row_widgets[gname] = (action_entry, sl, sw_var, action_type, hold_var)
 
             # Save row
             save_row = ctk.CTkFrame(scroller_g, fg_color="transparent")
@@ -758,12 +804,29 @@ class GazeDashApp(ctk.CTk):
         def save_gestures(profile_name):
             updated = cfg_state["config"]
             thr_payload = {}
-            for gname, (entry, sl, sw_var) in self._gesture_row_widgets.items():
+            for gname, (entry, sl, sw_var, action_type, hold_var) in self._gesture_row_widgets.items():
                 keys_raw = entry.get().strip()
-                if keys_raw and sw_var.get():
+                if sw_var.get() and action_type in {"mouse_click", "mouse_double_click"}:
+                    updated = set_profile_gesture_action(
+                        updated,
+                        profile_name,
+                        gname,
+                        keys=[],
+                        label=gname,
+                        action_type=action_type,
+                    )
+                elif keys_raw and sw_var.get():
                     keys = parse_hotkey_spec(keys_raw)
                     if keys:
-                        updated = set_profile_gesture_action(updated, profile_name, gname, keys=keys, label=gname)
+                        selected_action_type = "key_hold" if bool(hold_var.get()) else "hotkey"
+                        updated = set_profile_gesture_action(
+                            updated,
+                            profile_name,
+                            gname,
+                            keys=keys,
+                            label=gname,
+                            action_type=selected_action_type,
+                        )
                 else:
                     updated = remove_profile_gesture_action(updated, profile_name, gname)
                 thr_payload[gname] = float(sl.get())
@@ -1569,7 +1632,10 @@ class GazeDashApp(ctk.CTk):
     # ── Refresh state ─────────────────────────────────────────────────────────
 
     def refresh_state(self, *_):
+        self._gesture_executor.release_all_holds()
         self._config    = load_config()
+        self._gesture_arbiter = GestureArbiter.from_config(self._config)
+        self._restart_gesture_diagnostics_logger()
         self._voice_controller.update_config(self._config)
         profile_name    = get_active_profile_name(self._config)
         _, profile      = get_profile_details(self._config, profile_name)
@@ -1607,9 +1673,14 @@ class GazeDashApp(ctk.CTk):
         if hasattr(self, "_voice_module_count_labels"):
             self._refresh_voice_module_counts()
 
+    def _restart_gesture_diagnostics_logger(self):
+        if hasattr(self, "_gesture_diag_logger") and self._gesture_diag_logger is not None:
+            self._gesture_diag_logger.close()
+        self._gesture_diag_logger = GestureDiagnosticsLogger.from_config(self._config, component="ui")
+
     # ── Preview update ────────────────────────────────────────────────────────
 
-    def _update_preview_widgets(self, photo, detected_gesture, face_data=None, mini_photo=None):
+    def _update_preview_widgets(self, photo, detected_gesture, face_data=None, mini_photo=None, gesture_debug=None):
         self._preview_image        = photo
         self._last_detected_gesture = detected_gesture
 
@@ -1626,9 +1697,12 @@ class GazeDashApp(ctk.CTk):
         action = map_gesture(detected_gesture) if detected_gesture and detected_gesture != "Sin gesto" else None
         if action and isinstance(action, dict):
             keys_text = " + ".join(action.get("keys") or [])
-            self._active_action_label.configure(text=f"→  {keys_text or '—'}")
+            action_text = keys_text or action.get("label") or action.get("type") or "—"
+            self._active_action_label.configure(text=f"→  {action_text}")
         else:
             self._active_action_label.configure(text="→  —")
+
+        self._apply_gesture_debug(gesture_debug)
 
         # Métricas faciales
         if face_data and isinstance(face_data, dict):
@@ -1665,6 +1739,55 @@ class GazeDashApp(ctk.CTk):
         # Vista voz — mini preview
         if hasattr(self, "_voz_mini_preview"):
             self._voz_mini_preview.configure(image=photo, text="")
+
+    def _apply_gesture_debug(self, gesture_debug):
+        if not isinstance(gesture_debug, dict) or not hasattr(self, "_gesture_diag_winner"):
+            return
+
+        active = gesture_debug.get("active") or []
+        raw_active = gesture_debug.get("raw_active") or []
+        groups = gesture_debug.get("groups") or {}
+
+        rejected = []
+        waiting = []
+        score_lookup = {}
+        for group_name, details in groups.items():
+            if not isinstance(details, dict):
+                continue
+            scores = details.get("scores") or {}
+            if isinstance(scores, dict):
+                score_lookup.update(scores)
+            rejected.extend(details.get("rejected") or [])
+            candidate = details.get("candidate")
+            active_winner = details.get("active")
+            if candidate and candidate != active_winner:
+                current = int(details.get("candidate_frames") or 0)
+                required = int(details.get("required_activation_frames") or 0)
+                confidence = self._gesture_debug_confidence(score_lookup.get(candidate))
+                waiting.append(f"{candidate} {confidence} {current}/{required}".strip())
+
+        winner_text = ", ".join(
+            f"{gesture_name} {self._gesture_debug_confidence(score_lookup.get(gesture_name))}".strip()
+            for gesture_name in active
+        ) if active else "—"
+        raw_text = ", ".join(raw_active) if raw_active else "—"
+        rejected_text = ", ".join(dict.fromkeys(rejected)) if rejected else "—"
+
+        if waiting and not active:
+            winner_text = f"esperando {', '.join(waiting[:2])}"
+
+        self._gesture_diag_winner.configure(text=f"Ganador: {winner_text[:42]}")
+        self._gesture_diag_raw.configure(text=f"Crudos: {raw_text[:70]}")
+        self._gesture_diag_rejected.configure(text=f"Descartados: {rejected_text[:64]}")
+
+    @staticmethod
+    def _gesture_debug_confidence(score_info):
+        if not isinstance(score_info, dict):
+            return ""
+        try:
+            return f"{float(score_info.get('confidence', 0.0)):.2f}"
+        except (TypeError, ValueError):
+            return ""
 
     @staticmethod
     def _direction(dx, dy):
@@ -1833,9 +1956,6 @@ class GazeDashApp(ctk.CTk):
                                 self._mouse_controller.update(nx, ny)
 
                     if face_data is not None:
-                        lb = face_data.get("eye_blink_left", 0.0)
-                        rb = face_data.get("eye_blink_right", 0.0)
-                        print(f"BLINK  L={lb:.3f}  R={rb:.3f}")
                         self._blink_click_controller.update(face_data)
                         self._last_confidence = max(
                             float(face_data.get("mouth_open", 0.0)),
@@ -1843,14 +1963,29 @@ class GazeDashApp(ctk.CTk):
                             0.85,
                         )
 
-                    gestures = self._gesture_detector.detect(face_data)
+                    raw_gestures = self._gesture_detector.detect(face_data)
+                    gestures = self._gesture_arbiter.filter(
+                        raw_gestures,
+                        action_resolver=lambda gesture_name: map_gesture(gesture_name, self._config),
+                    )
+                    gesture_debug = dict(self._gesture_arbiter.last_debug)
                     _, detected_gesture = self._summarize_input(gestures)
+                    diag_logger = self._gesture_diag_logger
+                    if diag_logger is not None:
+                        diag_logger.record(
+                            gesture_debug,
+                            profile_name=get_active_profile_name(self._config),
+                            detected_gesture=detected_gesture,
+                        )
 
                     if self._controller_active and not self._controller_paused:
                         self._handle_gestures(gestures)
                         self._voice_controller.handle_gesture_input(gestures)
+                    else:
+                        self._gesture_executor.release_all_holds()
 
                 except Exception:
+                    self._gesture_executor.release_all_holds()
                     continue
 
                 rgb   = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -1873,14 +2008,18 @@ class GazeDashApp(ctk.CTk):
 
                 self.after(
                     0,
-                    lambda p=photo, mp=mini_photo, g=detected_gesture, f=fd:
-                        self._update_preview_widgets(p, g, f, mp),
+                    lambda p=photo, mp=mini_photo, g=detected_gesture, f=fd, gd=gesture_debug:
+                        self._update_preview_widgets(p, g, f, mp, gd),
                 )
 
         self._preview_thread = threading.Thread(target=worker, daemon=True)
         self._preview_thread.start()
 
     def stop_camera_preview(self):
+        self._gesture_executor.release_all_holds()
+        if hasattr(self, "_gesture_diag_logger") and self._gesture_diag_logger is not None:
+            self._gesture_diag_logger.close()
+            self._gesture_diag_logger = None
         self._preview_stop_event.set()
         if self._camera is not None:
             close_camera(self._camera)

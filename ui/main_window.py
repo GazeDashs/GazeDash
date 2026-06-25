@@ -111,7 +111,7 @@ def _action_button(parent, text, cmd, col=None, fg=CARD, text_col=TEXT):
 # ── Aplicación principal ──────────────────────────────────────────────────────
 
 class GazeDashApp(ctk.CTk):
-    _GESTURE_META_KEYS = {"has_face", "calibrating", "calibration_progress"}
+    _GESTURE_META_KEYS = {"has_face", "calibrating", "calibration_progress", "gesture_scores"}
     _NAV_ITEMS = [
         ("inicio",        "⌂",  "Inicio"),
         ("configuracion", "⚙",  "Configuración"),
@@ -1734,18 +1734,26 @@ class GazeDashApp(ctk.CTk):
 
         rejected = []
         waiting = []
+        score_lookup = {}
         for group_name, details in groups.items():
             if not isinstance(details, dict):
                 continue
+            scores = details.get("scores") or {}
+            if isinstance(scores, dict):
+                score_lookup.update(scores)
             rejected.extend(details.get("rejected") or [])
             candidate = details.get("candidate")
             active_winner = details.get("active")
             if candidate and candidate != active_winner:
                 current = int(details.get("candidate_frames") or 0)
                 required = int(details.get("required_activation_frames") or 0)
-                waiting.append(f"{candidate} {current}/{required}")
+                confidence = self._gesture_debug_confidence(score_lookup.get(candidate))
+                waiting.append(f"{candidate} {confidence} {current}/{required}".strip())
 
-        winner_text = ", ".join(active) if active else "—"
+        winner_text = ", ".join(
+            f"{gesture_name} {self._gesture_debug_confidence(score_lookup.get(gesture_name))}".strip()
+            for gesture_name in active
+        ) if active else "—"
         raw_text = ", ".join(raw_active) if raw_active else "—"
         rejected_text = ", ".join(dict.fromkeys(rejected)) if rejected else "—"
 
@@ -1755,6 +1763,15 @@ class GazeDashApp(ctk.CTk):
         self._gesture_diag_winner.configure(text=f"Ganador: {winner_text[:42]}")
         self._gesture_diag_raw.configure(text=f"Crudos: {raw_text[:70]}")
         self._gesture_diag_rejected.configure(text=f"Descartados: {rejected_text[:64]}")
+
+    @staticmethod
+    def _gesture_debug_confidence(score_info):
+        if not isinstance(score_info, dict):
+            return ""
+        try:
+            return f"{float(score_info.get('confidence', 0.0)):.2f}"
+        except (TypeError, ValueError):
+            return ""
 
     @staticmethod
     def _direction(dx, dy):

@@ -189,6 +189,27 @@ class GestureArbiterTests(unittest.TestCase):
         self.assertEqual(eye_debug["candidate_frames"], 1)
         self.assertEqual(eye_debug["required_activation_frames"], 3)
 
+    def test_score_confidence_breaks_ties_inside_group(self):
+        arbiter = GestureArbiter(activation_frames=1)
+        gestures = {
+            "has_face": True,
+            "calibrating": False,
+            "calibration_progress": 1.0,
+            "mouth_open": True,
+            "mouth_o": True,
+            "gesture_scores": {
+                "mouth_open": {"confidence": 0.95, "margin": 0.4, "score": 1.4},
+                "mouth_o": {"confidence": 0.2, "margin": -0.2, "score": 0.8},
+            },
+        }
+
+        filtered = arbiter.filter(gestures)
+
+        self.assertTrue(filtered["mouth_open"])
+        self.assertFalse(filtered["mouth_o"])
+        self.assertEqual(arbiter.last_debug["groups"]["mouth"]["candidate"], "mouth_open")
+        self.assertEqual(arbiter.last_debug["groups"]["mouth"]["scores"]["mouth_open"]["confidence"], 0.95)
+
 
 if __name__ == "__main__":
     unittest.main()

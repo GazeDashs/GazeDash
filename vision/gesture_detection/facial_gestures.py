@@ -34,6 +34,20 @@ NEUTRAL_METRIC_FIELDS = (
     "nose_sneer_right",
 )
 
+GESTURE_NAMES = (
+    "mouth_pucker",
+    "mouth_open",
+    "mouth_o",
+    "smile",
+    "smile_left",
+    "smile_right",
+    "brow_raise",
+    "brow_frown",
+    "eye_blink",
+    "eye_wide",
+    "nose_sneer",
+)
+
 
 @dataclass(frozen=True)
 class FacialGestureThresholds:
@@ -223,6 +237,43 @@ class FacialGestureDetector:
         scale = self.GESTURE_SCALES.get(gesture_name, 1.0)
         return float(base_threshold) * float(scale)
 
+    @staticmethod
+    def _confidence_from_margin(score: float, threshold: float) -> float:
+        threshold = max(float(threshold), 0.001)
+        normalized = float(score) / threshold
+        return max(0.0, min(1.0, normalized))
+
+    @staticmethod
+    def _ratio(delta: float, threshold: float) -> float:
+        threshold = max(float(threshold), 0.001)
+        return max(0.0, float(delta) / threshold)
+
+    def _score_payload(self, score: float, threshold: float, active_raw: bool, *, detail: str = "") -> Dict[str, float | bool | str]:
+        score = float(score)
+        threshold = float(threshold)
+        return {
+            "score": score,
+            "threshold": threshold,
+            "margin": score - threshold,
+            "confidence": self._confidence_from_margin(score, threshold),
+            "active_raw": bool(active_raw),
+            "detail": detail,
+        }
+
+    def _empty_gesture_scores(self) -> Dict[str, Dict[str, float | bool | str]]:
+        return {gesture_name: self._score_payload(0.0, 1.0, False) for gesture_name in GESTURE_NAMES}
+
+    def _base_result(self, *, has_face: bool, calibrating: bool, calibration_progress: float):
+        result = {
+            "has_face": has_face,
+            "calibrating": calibrating,
+            "calibration_progress": calibration_progress,
+            "gesture_scores": self._empty_gesture_scores(),
+        }
+        for gesture_name in GESTURE_NAMES:
+            result[gesture_name] = False
+        return result
+
     def calibration_progress(self) -> float:
         if self._calibrated:
             return 1.0
@@ -234,81 +285,52 @@ class FacialGestureDetector:
     def detect(self, face_data: Optional[dict]) -> dict:
         if face_data is None:
             self.reset_calibration()
-            return {
-                "has_face": False,
-                "calibrating": not self._calibrated,
-                "calibration_progress": self.calibration_progress(),
-                "mouth_pucker": False,
-                "mouth_open": False,
-                "mouth_o": False,
-                "smile": False,
-                "smile_left": False,
-                "smile_right": False,
-                "brow_raise": False,
-                "brow_frown": False,
-                "eye_blink": False,
-                "eye_wide": False,
-                "nose_sneer": False,
-            }
+            return self._base_result(
+                has_face=False,
+                calibrating=not self._calibrated,
+                calibration_progress=self.calibration_progress(),
+            )
 
         metrics = self._normalize_face_data(face_data)
 
         if not self._calibrated:
             self._collect_neutral_sample(metrics)
             if self._calibrated:
-                return {
-                    "has_face": True,
-                    "calibrating": False,
-                    "calibration_progress": 1.0,
-                    "mouth_pucker": False,
-                    "mouth_open": False,
-                    "mouth_o": False,
-                    "smile": False,
-                    "smile_left": False,
-                    "smile_right": False,
-                    "brow_raise": False,
-                    "brow_frown": False,
-                    "eye_blink": False,
-                    "eye_wide": False,
-                    "nose_sneer": False,
-                }
+                return self._base_result(has_face=True, calibrating=False, calibration_progress=1.0)
 
-            return {
-                "has_face": True,
-                "calibrating": True,
-                "calibration_progress": self.calibration_progress(),
-                "mouth_pucker": False,
-                "mouth_open": False,
-                "mouth_o": False,
-                "smile": False,
-                "smile_left": False,
-                "smile_right": False,
-                "brow_raise": False,
-                "brow_frown": False,
-                "eye_blink": False,
-                "eye_wide": False,
-                "nose_sneer": False,
-            }
+            return self._base_result(
+                has_face=True,
+                calibrating=True,
+                calibration_progress=self.calibration_progress(),
+            )
 
+        gesture_scores = self._empty_gesture_scores()
+
+        mouth_open_threshold = self._scaled_threshold("mouth_open", self.thresholds.mouth_open)
+        mouth_open_funnel_limit = self._scaled_threshold(
+            "mouth_open", self.thresholds.mouth_funnel - self.thresholds.mouth_conflict_margin
+        )
+        mouth_open_jaw_delta = metrics.get("jaw_open_score", 0.0) - self._neutral_value("jaw_open_score")
+        mouth_open_ratio_delta = metrics.get("mouth_ratio", 0.0) - self._neutral_value("mouth_ratio")
+        mouth_open_funnel_delta = metrics.get("mouth_funnel_score", 0.0) - self._neutral_value("mouth_funnel_score")
+        mouth_open_blend_score = self._ratio(mouth_open_jaw_delta, mouth_open_threshold)
+        mouth_open_geometry_score = self._ratio(mouth_open_ratio_delta, self.GEOMETRY_DELTAS["mouth_open"])
+        mouth_open_score = max(mouth_open_blend_score, mouth_open_geometry_score)
         mouth_open = (
-            (
-                metrics.get("jaw_open_score", 0.0)
-                >= self._neutral_value("jaw_open_score") + self._scaled_threshold("mouth_open", self.thresholds.mouth_open)
-                and metrics.get("mouth_funnel_score", 0.0)
-                < self._neutral_value("mouth_funnel_score") + self._scaled_threshold(
-                    "mouth_open", self.thresholds.mouth_funnel - self.thresholds.mouth_conflict_margin
-                )
-            )
-            or metrics.get("mouth_ratio", 0.0) >= self._neutral_value("mouth_ratio") + self.GEOMETRY_DELTAS["mouth_open"]
+            (mouth_open_blend_score >= 1.0 and mouth_open_funnel_delta < mouth_open_funnel_limit)
+            or mouth_open_geometry_score >= 1.0
         )
-        mouth_o = (
-            metrics.get("mouth_funnel_score", 0.0)
-            >= self._neutral_value("mouth_funnel_score") + self._scaled_threshold("mouth_o", self.thresholds.mouth_funnel)
-            and metrics.get("jaw_open_score", 0.0)
-            >= self._neutral_value("jaw_open_score") + self._scaled_threshold(
-                "mouth_o", self.thresholds.mouth_open - self.thresholds.mouth_conflict_margin
-            )
+
+        mouth_o_funnel_threshold = self._scaled_threshold("mouth_o", self.thresholds.mouth_funnel)
+        mouth_o_jaw_threshold = self._scaled_threshold(
+            "mouth_o", self.thresholds.mouth_open - self.thresholds.mouth_conflict_margin
         )
+        mouth_o_funnel_delta = metrics.get("mouth_funnel_score", 0.0) - self._neutral_value("mouth_funnel_score")
+        mouth_o_jaw_delta = metrics.get("jaw_open_score", 0.0) - self._neutral_value("jaw_open_score")
+        mouth_o_funnel_score = self._ratio(mouth_o_funnel_delta, mouth_o_funnel_threshold)
+        mouth_o_jaw_score = self._ratio(mouth_o_jaw_delta, mouth_o_jaw_threshold)
+        mouth_o_score = min(mouth_o_funnel_score, mouth_o_jaw_score)
+        mouth_o = mouth_o_score >= 1.0
 
         left_eye_blink_delta = metrics.get("eye_blink_left", 0.0) - self._neutral_value("eye_blink_left")
         right_eye_blink_delta = metrics.get("eye_blink_right", 0.0) - self._neutral_value("eye_blink_right")
@@ -329,62 +351,98 @@ class FacialGestureDetector:
         # Blink only counts as a one-eye wink; simultaneous closure is ignored.
         eye_blink_active = left_eye_blink_active or right_eye_blink_active
 
+        eye_blink_score = max(
+            self._ratio(left_eye_blink_delta, blink_threshold),
+            self._ratio(right_eye_blink_delta, blink_threshold),
+        )
+
+        mouth_pucker_threshold = max(
+            self._neutral_value("mouth_pucker_score") + 0.25,
+            self._scaled_threshold("mouth_pucker", self.thresholds.mouth_pucker),
+        )
+        mouth_pucker_score_value = metrics.get("mouth_pucker_score", 0.0)
+        mouth_pucker_score = self._ratio(mouth_pucker_score_value, mouth_pucker_threshold)
+        mouth_pucker_support = (
+            metrics.get("mouth_ratio", 1.0) <= self._neutral_value("mouth_ratio") - 0.005
+            or metrics.get("mouth_funnel_score", 0.0) >= self._neutral_value("mouth_funnel_score") + 0.05
+        )
+
+        smile_left_delta = metrics.get("smile_left", 0.0) - self._neutral_value("smile_left")
+        smile_right_delta = metrics.get("smile_right", 0.0) - self._neutral_value("smile_right")
+        smile_left_threshold = self._scaled_threshold("smile_left", self.thresholds.smile_left)
+        smile_right_threshold = self._scaled_threshold("smile_right", self.thresholds.smile_right)
+        smile_left_score = self._ratio(smile_left_delta, smile_left_threshold)
+        smile_right_score = self._ratio(smile_right_delta, smile_right_threshold)
+        smile_score = min(smile_left_score, smile_right_score)
+
+        brow_raise_threshold = self._scaled_threshold("brow_raise", self.thresholds.brow_raise)
+        brow_raise_inner_delta = metrics.get("brow_inner_up", 0.0) - self._neutral_value("brow_inner_up")
+        brow_raise_ratio_delta = metrics.get("brow_ratio", 0.0) - self._neutral_value("brow_ratio")
+        brow_raise_score = max(
+            self._ratio(brow_raise_inner_delta, brow_raise_threshold),
+            self._ratio(brow_raise_ratio_delta, self.GEOMETRY_DELTAS["brow_raise"]),
+        )
+
+        brow_frown_threshold = self._scaled_threshold("brow_frown", self.thresholds.brow_frown)
+        brow_frown_left_delta = metrics.get("brow_down_left", 0.0) - self._neutral_value("brow_down_left")
+        brow_frown_right_delta = metrics.get("brow_down_right", 0.0) - self._neutral_value("brow_down_right")
+        brow_frown_score = max(
+            self._ratio(brow_frown_left_delta, brow_frown_threshold),
+            self._ratio(brow_frown_right_delta, brow_frown_threshold),
+        )
+
+        eye_wide_threshold = self._scaled_threshold("eye_wide", self.thresholds.eye_wide)
+        eye_wide_left_delta = metrics.get("eye_wide_left", 0.0) - self._neutral_value("eye_wide_left")
+        eye_wide_right_delta = metrics.get("eye_wide_right", 0.0) - self._neutral_value("eye_wide_right")
+        eye_wide_score = max(
+            self._ratio(eye_wide_left_delta, eye_wide_threshold),
+            self._ratio(eye_wide_right_delta, eye_wide_threshold),
+        )
+
+        nose_sneer_threshold = self._scaled_threshold("nose_sneer", self.thresholds.nose_sneer)
+        nose_sneer_left_delta = metrics.get("nose_sneer_left", 0.0) - self._neutral_value("nose_sneer_left")
+        nose_sneer_right_delta = metrics.get("nose_sneer_right", 0.0) - self._neutral_value("nose_sneer_right")
+        nose_sneer_score = max(
+            self._ratio(nose_sneer_left_delta, nose_sneer_threshold),
+            self._ratio(nose_sneer_right_delta, nose_sneer_threshold),
+        )
+
         raw_gestures = {
             # mouth_pucker requires both a high blendshape _and_ a supporting geometry change
-            "mouth_pucker": (
-                (
-                    metrics.get("mouth_pucker_score", 0.0)
-                    >= max(
-                        self._neutral_value("mouth_pucker_score") + 0.25,
-                        self._scaled_threshold("mouth_pucker", self.thresholds.mouth_pucker),
-                    )
-                )
-                and (
-                    # either the mouth gets narrower (pursing) OR mouthFunnel increases
-                    metrics.get("mouth_ratio", 1.0)
-                    <= self._neutral_value("mouth_ratio") - 0.005
-                    or metrics.get("mouth_funnel_score", 0.0)
-                    >= self._neutral_value("mouth_funnel_score") + 0.05
-                )
-            ),
+            "mouth_pucker": mouth_pucker_score >= 1.0 and mouth_pucker_support,
             "mouth_open": mouth_open,
             "mouth_o": mouth_o,
-            "smile_left": (
-                metrics.get("smile_left", 0.0)
-                >= self._neutral_value("smile_left") + self._scaled_threshold("smile_left", self.thresholds.smile_left)
-            ),
-            "smile_right": (
-                metrics.get("smile_right", 0.0)
-                >= self._neutral_value("smile_right") + self._scaled_threshold("smile_right", self.thresholds.smile_right)
-            ),
+            "smile_left": smile_left_score >= 1.0,
+            "smile_right": smile_right_score >= 1.0,
             # brow_raise must come from eyebrow motion, not from eyelid closure.
             # If blink/squint is active, ignore brow_raise to avoid false positives.
-            "brow_raise": (
-                not eye_blink_active
-                and (
-                    metrics.get("brow_inner_up", 0.0)
-                    >= self._neutral_value("brow_inner_up")
-                    + self._scaled_threshold("brow_raise", self.thresholds.brow_raise)
-                    or metrics.get("brow_ratio", 0.0)
-                    >= self._neutral_value("brow_ratio") + self.GEOMETRY_DELTAS["brow_raise"]
-                )
-            ),
-            "brow_frown": (
-                metrics.get("brow_down_left", 0.0)
-                >= self._neutral_value("brow_down_left") + self._scaled_threshold("brow_frown", self.thresholds.brow_frown)
-                or metrics.get("brow_down_right", 0.0)
-                >= self._neutral_value("brow_down_right") + self._scaled_threshold("brow_frown", self.thresholds.brow_frown)
-            ),
+            "brow_raise": not eye_blink_active and brow_raise_score >= 1.0,
+            "brow_frown": brow_frown_score >= 1.0,
             "eye_blink": eye_blink_active,
-            "eye_wide": (
-                metrics.get("eye_wide_left", 0.0) >= self._neutral_value("eye_wide_left") + self._scaled_threshold("eye_wide", self.thresholds.eye_wide)
-                or metrics.get("eye_wide_right", 0.0) >= self._neutral_value("eye_wide_right") + self._scaled_threshold("eye_wide", self.thresholds.eye_wide)
-            ),
-            "nose_sneer": (
-                metrics.get("nose_sneer_left", 0.0) >= self._neutral_value("nose_sneer_left") + self._scaled_threshold("nose_sneer", self.thresholds.nose_sneer)
-                or metrics.get("nose_sneer_right", 0.0) >= self._neutral_value("nose_sneer_right") + self._scaled_threshold("nose_sneer", self.thresholds.nose_sneer)
-            ),
+            "eye_wide": eye_wide_score >= 1.0,
+            "nose_sneer": nose_sneer_score >= 1.0,
         }
+
+        gesture_scores.update(
+            {
+                "mouth_pucker": self._score_payload(
+                    mouth_pucker_score,
+                    1.0,
+                    raw_gestures["mouth_pucker"],
+                    detail="mouthPucker + geometry",
+                ),
+                "mouth_open": self._score_payload(mouth_open_score, 1.0, raw_gestures["mouth_open"], detail="jawOpen|mouthRatio"),
+                "mouth_o": self._score_payload(mouth_o_score, 1.0, raw_gestures["mouth_o"], detail="mouthFunnel+jawOpen"),
+                "smile_left": self._score_payload(smile_left_score, 1.0, raw_gestures["smile_left"], detail="mouthSmileLeft"),
+                "smile_right": self._score_payload(smile_right_score, 1.0, raw_gestures["smile_right"], detail="mouthSmileRight"),
+                "smile": self._score_payload(smile_score, 1.0, False, detail="left+right smile"),
+                "brow_raise": self._score_payload(brow_raise_score, 1.0, raw_gestures["brow_raise"], detail="browInnerUp|browRatio"),
+                "brow_frown": self._score_payload(brow_frown_score, 1.0, raw_gestures["brow_frown"], detail="browDown"),
+                "eye_blink": self._score_payload(eye_blink_score, 1.0, raw_gestures["eye_blink"], detail="one-eye blink"),
+                "eye_wide": self._score_payload(eye_wide_score, 1.0, raw_gestures["eye_wide"], detail="eyeWide"),
+                "nose_sneer": self._score_payload(nose_sneer_score, 1.0, raw_gestures["nose_sneer"], detail="noseSneer"),
+            }
+        )
 
         # Apply minimum absolute deltas where configured
         for name, min_delta in self.MIN_ABSOLUTE_DELTAS.items():
@@ -396,11 +454,17 @@ class FacialGestureDetector:
                     )
                 elif name == "mouth_pucker":
                     delta = metrics.get("mouth_pucker_score", 0.0) - self._neutral_value("mouth_pucker_score")
+                elif name == "eye_blink":
+                    delta = max(left_eye_blink_delta, right_eye_blink_delta)
                 else:
                     delta = metrics.get(f"{name}_score", 0.0) - self._neutral_value(f"{name}_score")
 
                 if delta < float(min_delta):
                     raw_gestures[name] = False
+
+        for name, is_active in raw_gestures.items():
+            if name in gesture_scores:
+                gesture_scores[name]["active_raw"] = bool(is_active)
 
         # Debounce: require N consecutive frames
         gestures = {"has_face": True, "calibrating": False, "calibration_progress": 1.0}
@@ -419,8 +483,22 @@ class FacialGestureDetector:
         # Treat the bilateral smile as the conjunction of the two confirmed side smiles.
         # This lets `smile` fire even when left/right reach threshold on adjacent frames.
         gestures["smile"] = bool(gestures.get("smile_left")) and bool(gestures.get("smile_right"))
+        gesture_scores["smile"]["active_raw"] = bool(raw_gestures.get("smile_left")) and bool(raw_gestures.get("smile_right"))
+        gesture_scores["smile"]["confidence"] = min(
+            float(gesture_scores["smile_left"]["confidence"]),
+            float(gesture_scores["smile_right"]["confidence"]),
+        )
+        gesture_scores["smile"]["margin"] = min(
+            float(gesture_scores["smile_left"]["margin"]),
+            float(gesture_scores["smile_right"]["margin"]),
+        )
+        gestures["gesture_scores"] = gesture_scores
 
-        if not any(value for key, value in gestures.items() if key not in {"has_face", "calibrating", "calibration_progress"}):
+        if not any(
+            value
+            for key, value in gestures.items()
+            if key not in {"has_face", "calibrating", "calibration_progress", "gesture_scores"}
+        ):
             self._adapt_neutral_baseline(metrics)
 
         return gestures

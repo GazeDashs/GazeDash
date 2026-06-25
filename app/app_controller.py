@@ -16,7 +16,7 @@ from core.gesture_engine.hotkey_executor import HotkeyExecutor
 from core.voice_control.voice_control import VoiceCommandController
 
 class AppController:
-    _GESTURE_META_KEYS = {"has_face", "calibrating", "calibration_progress"}
+    _GESTURE_META_KEYS = {"has_face", "calibrating", "calibration_progress", "gesture_scores"}
 
     def __init__(self):
         self.cap = None

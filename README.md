@@ -28,6 +28,7 @@ GazeDash es una **aplicación funcional** con UI completa, detección facial en 
 | Mini overlay al minimizar (gesto + estado de voz) | ✅ Completo |
 | Diagnóstico de gestos crudos/ganadores/descartados | ✅ Completo |
 | Logs JSONL de diagnóstico por sesión | ✅ Completo |
+| Puntajes/confianza por gesto (`gesture_scores`) | ✅ Completo |
 | Control por mirada estimada | 🔲 Pendiente |
 | Tests automatizados | 🔲 Pendiente |
 
@@ -117,6 +118,26 @@ FacialGestureDetector → GestureArbiter → GestureMapper → HotkeyExecutor
 
 Además aplica estabilidad temporal configurable en `gesture_arbitration`: frames para activar y frames para soltar. Esto evita disparos dobles y parpadeos de un frame.
 
+El detector conserva los booleanos existentes y agrega `gesture_scores`:
+
+```python
+{
+  "mouth_open": False,
+  "gesture_scores": {
+    "mouth_open": {
+      "score": 1.33,
+      "threshold": 1.0,
+      "margin": 0.33,
+      "confidence": 1.0,
+      "active_raw": True,
+      "detail": "jawOpen|mouthRatio"
+    }
+  }
+}
+```
+
+`active_raw` indica que el gesto superó el umbral antes del debounce. El booleano del gesto puede seguir en `False` hasta juntar los frames requeridos. `GestureArbiter` usa `confidence` y `margin` para desempatar candidatos dentro del mismo grupo.
+
 La configuración base está en `config/default_config.json`:
 
 ```json
@@ -156,7 +177,7 @@ Uso recomendado:
 
 - Si `Crudos` muestra varios gestos al hacer uno solo, hay confusión de detector o umbral.
 - Si el gesto correcto aparece en `Crudos` pero no en `Ganador`, ajustar `priorities` o los frames de activación.
-- Si aparece `esperando nombre 1/3`, el gesto está siendo confirmado; bajar frames si se siente lento, subirlos si dispara por accidente.
+- Si aparece `esperando nombre 0.82 1/3`, el gesto está siendo confirmado con confianza aproximada `0.82`; bajar frames si se siente lento, subirlos si dispara por accidente.
 - Si un gesto aparece seguido en `Descartados`, conviene quitarle acción en ese perfil o endurecerlo.
 
 ### Logs de sesión
@@ -173,7 +194,7 @@ Cada línea contiene:
 - `detected_gesture`: gesto filtrado mostrado/ejecutable.
 - `debug.raw_active`: gestos crudos antes del arbitraje.
 - `debug.active`: gestos ganadores.
-- `debug.groups`: candidatos, descartados y frames de activación/liberación por grupo.
+- `debug.groups`: candidatos, descartados, puntajes y frames de activación/liberación por grupo.
 
 La configuración está en `gesture_diagnostics`:
 
@@ -195,10 +216,10 @@ Uso recomendado:
 
 Próximos pasos recomendados:
 
-1. Agregar puntajes/confianza por gesto, no solo booleanos.
-2. Separar umbral de activación y liberación dentro del detector facial.
-3. Calibrar con ejemplos negativos para aprender confusores.
-4. Crear una herramienta que resuma los logs y sugiera cambios de perfil.
+1. Separar umbral de activación y liberación dentro del detector facial.
+2. Calibrar con ejemplos negativos para aprender confusores.
+3. Crear una herramienta que resuma los logs y sugiera cambios de perfil.
+4. Mostrar gráficos simples de confianza por gesto durante calibración.
 
 ---
 

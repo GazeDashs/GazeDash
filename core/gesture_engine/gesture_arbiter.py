@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, Iterable, Optional
 
 
-META_KEYS = {"has_face", "calibrating", "calibration_progress"}
+META_KEYS = {"has_face", "calibrating", "calibration_progress", "gesture_scores"}
 
 
 DEFAULT_CONFLICT_GROUPS = {
@@ -154,6 +154,7 @@ class GestureArbiter:
             return filtered
 
         active_names = self._active_gesture_names(gestures)
+        gesture_scores = gestures.get("gesture_scores", {}) if isinstance(gestures.get("gesture_scores"), dict) else {}
 
         grouped: dict[str, list[str]] = {group_name: [] for group_name in self.conflict_groups}
         ungrouped = []
@@ -166,11 +167,18 @@ class GestureArbiter:
 
         debug_groups = {}
         for group_name, candidates in grouped.items():
-            winner = self._choose_winner(candidates, action_resolver)
+            winner = self._choose_winner(candidates, action_resolver, gesture_scores)
             active_winner = self._stable_winner(group_name, winner, action_resolver)
             if active_winner:
                 filtered[active_winner] = True
-            debug_groups[group_name] = self._group_debug(group_name, candidates, winner, active_winner, action_resolver)
+            debug_groups[group_name] = self._group_debug(
+                group_name,
+                candidates,
+                winner,
+                active_winner,
+                action_resolver,
+                gesture_scores,
+            )
 
         for gesture_name in ungrouped:
             filtered[gesture_name] = True
@@ -212,6 +220,7 @@ class GestureArbiter:
         winner: Optional[str],
         active_winner: Optional[str],
         action_resolver: Optional[Callable[[str], Optional[Dict[str, Any]]]],
+        gesture_scores: Dict[str, Any],
     ) -> Dict[str, Any]:
         rejected = [gesture_name for gesture_name in candidates if gesture_name != active_winner]
         return {
@@ -219,6 +228,10 @@ class GestureArbiter:
             "candidate": winner,
             "active": active_winner,
             "rejected": rejected,
+            "scores": {
+                gesture_name: self._compact_score(gesture_scores.get(gesture_name))
+                for gesture_name in candidates
+            },
             "candidate_frames": self._candidate_counts.get(group_name, 0),
             "release_frames": self._release_counts.get(group_name, 0),
             "required_activation_frames": self._required_frames(winner, action_resolver) if winner else 0,
@@ -231,6 +244,7 @@ class GestureArbiter:
         self,
         candidates: Iterable[str],
         action_resolver: Optional[Callable[[str], Optional[Dict[str, Any]]]],
+        gesture_scores: Optional[Dict[str, Any]] = None,
     ) -> Optional[str]:
         candidate_list = list(candidates)
         if not candidate_list:
@@ -238,10 +252,50 @@ class GestureArbiter:
 
         def rank(gesture_name: str):
             action = action_resolver(gesture_name) if action_resolver else None
-            mapped_bonus = 100 if action else 0
-            return (mapped_bonus + int(self.priorities.get(gesture_name, 0)), gesture_name)
+            mapped_bonus = 10000 if action else 0
+            score_info = (gesture_scores or {}).get(gesture_name)
+            confidence, margin = self._score_rank_values(score_info)
+            confidence_bonus = int(confidence * 1000)
+            margin_bonus = int(max(-1.0, min(3.0, margin)) * 100)
+            return (
+                mapped_bonus,
+                confidence_bonus,
+                margin_bonus,
+                int(self.priorities.get(gesture_name, 0)),
+                gesture_name,
+            )
 
         return max(candidate_list, key=rank)
+
+    @staticmethod
+    def _score_rank_values(score_info: Any) -> tuple[float, float]:
+        if not isinstance(score_info, dict):
+            return 0.0, 0.0
+        try:
+            confidence = float(score_info.get("confidence", 0.0))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        try:
+            margin = float(score_info.get("margin", 0.0))
+        except (TypeError, ValueError):
+            margin = 0.0
+        return confidence, margin
+
+    @classmethod
+    def _compact_score(cls, score_info: Any) -> Dict[str, Any]:
+        if not isinstance(score_info, dict):
+            return {"confidence": 0.0, "margin": 0.0, "score": 0.0}
+        confidence, margin = cls._score_rank_values(score_info)
+        try:
+            score = float(score_info.get("score", 0.0))
+        except (TypeError, ValueError):
+            score = 0.0
+        return {
+            "score": round(score, 3),
+            "confidence": round(confidence, 3),
+            "margin": round(margin, 3),
+            "detail": score_info.get("detail", ""),
+        }
 
     def _stable_winner(
         self,

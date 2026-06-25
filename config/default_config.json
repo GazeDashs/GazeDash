@@ -2,6 +2,46 @@
   "active_profile": "navegacion",
   "smoothing_alpha": 0.5,
   "gesture_cooldown": 0.5,
+  "gesture_arbitration": {
+    "enabled": true,
+    "activation_frames": 2,
+    "hold_activation_frames": 1,
+    "release_frames": 2,
+    "hold_release_frames": 1,
+    "activation_frames_by_gesture": {
+      "mouth_o": 3,
+      "smile": 3,
+      "brow_raise": 3,
+      "brow_frown": 3,
+      "eye_blink": 3
+    },
+    "release_frames_by_gesture": {
+      "mouth_o": 2,
+      "smile": 2,
+      "brow_raise": 2,
+      "brow_frown": 2,
+      "eye_blink": 2
+    },
+    "priorities": {
+      "mouth_pucker": 30,
+      "mouth_o": 20,
+      "mouth_open": 10,
+      "smile": 30,
+      "smile_right": 20,
+      "smile_left": 20,
+      "eye_wide": 20,
+      "eye_blink": 10,
+      "brow_raise": 20,
+      "brow_frown": 20,
+      "nose_sneer": 10
+    }
+  },
+  "gesture_diagnostics": {
+    "enabled": true,
+    "log_dir": "logs/gesture_diagnostics",
+    "min_interval_seconds": 0.25,
+    "only_log_changes": true
+  },
   "camera_index": 0,
   "voice_control": {
     "enabled": false,

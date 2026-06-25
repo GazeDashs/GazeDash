@@ -9,6 +9,8 @@ from vision.camera.camera_stream import close_camera, open_camera, read_frame
 from vision.face_tracking.face_detector import MediaPipeFaceDetector
 from vision.gesture_detection.facial_gestures import FacialGestureDetector
 from core.gesture_engine.cooldown_manager import CooldownManager
+from core.gesture_engine.gesture_arbiter import GestureArbiter
+from core.gesture_engine.gesture_diagnostics_logger import GestureDiagnosticsLogger
 from core.gesture_engine.gesture_mapper import map_gesture
 from core.gesture_engine.hotkey_executor import HotkeyExecutor
 from core.voice_control.voice_control import VoiceCommandController
@@ -32,6 +34,8 @@ class AppController:
             landmark_offsets=face_landmarks_cfg.get("offsets", {}),
         )
         self.gesture_detector = FacialGestureDetector()
+        self.gesture_arbiter = GestureArbiter.from_config(self.config)
+        self.gesture_diag_logger = GestureDiagnosticsLogger.from_config(self.config, component="opencv")
         self.gesture_executor = HotkeyExecutor()
         self.voice_controller = VoiceCommandController(self.config, status_callback=lambda message: print(f"Voz: {message}"))
         self.voice_controller.start()
@@ -86,7 +90,16 @@ class AppController:
                 if face_landmarks_list:
                     self._last_face_landmarks = face_landmarks_list[0]
                     self._last_frame_size = frame.shape[:2]
-                gestures = self.gesture_detector.detect(face_data)
+                raw_gestures = self.gesture_detector.detect(face_data)
+                gestures = self.gesture_arbiter.filter(
+                    raw_gestures,
+                    action_resolver=lambda gesture_name: map_gesture(gesture_name, self.config),
+                )
+                self.gesture_diag_logger.record(
+                    self.gesture_arbiter.last_debug,
+                    profile_name=self.config.get("active_profile"),
+                    detected_gesture=self._first_active_gesture(gestures),
+                )
                 self._handle_gestures(gestures)
                 self.voice_controller.handle_gesture_input(gestures)
                 if raw_face_result is not None:
@@ -114,6 +127,7 @@ class AppController:
                     self._selected_landmark_idx = (self._selected_landmark_idx - 1) % len(self._editable_landmarks)
         finally:
             self.gesture_executor.release_all_holds()
+            self.gesture_diag_logger.close()
             close_camera(self.cap)
             self.face_detector.close()
             self.voice_controller.stop()
@@ -213,6 +227,16 @@ class AppController:
             except RuntimeError as exc:
                 # pyautogui no instalado u otro fallo de ejecución
                 print(f"No se pudo ejecutar la accion para {gesture_name}: {exc}")
+
+    def _first_active_gesture(self, gestures):
+        if not isinstance(gestures, dict):
+            return "Sin gesto"
+        for gesture_name, is_active in gestures.items():
+            if gesture_name in self._GESTURE_META_KEYS:
+                continue
+            if is_active:
+                return gesture_name
+        return "Sin gesto"
 
     def run_gesture_calibration_flow(self):
         """Interactive flow: choose a gesture, wait for neutral calibration,
@@ -469,6 +493,9 @@ class AppController:
                 self.config_manager.save(user_cfg)
                 # update in-memory merged config too
                 self.config = self.config_manager.load_merged()
+                self.gesture_arbiter = GestureArbiter.from_config(self.config)
+                self.gesture_diag_logger.close()
+                self.gesture_diag_logger = GestureDiagnosticsLogger.from_config(self.config, component="opencv")
             except Exception as exc:
                 print(f"No se pudo guardar offset: {exc}")
 
@@ -741,5 +768,9 @@ class AppController:
                 pass
 
     def _refresh_gesture_thresholds(self):
+        self.config = self.config_manager.load_merged()
+        self.gesture_arbiter = GestureArbiter.from_config(self.config)
+        self.gesture_diag_logger.close()
+        self.gesture_diag_logger = GestureDiagnosticsLogger.from_config(self.config, component="opencv")
         self.gesture_detector.thresholds = self.gesture_detector._load_thresholds_from_config()
 

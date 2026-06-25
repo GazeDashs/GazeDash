@@ -26,6 +26,8 @@ GazeDash es una **aplicación funcional** con UI completa, detección facial en 
 | Toggle de voz y mouse desde Configuración | ✅ Completo |
 | UI rediseñada: sidebar + 4 vistas (Inicio/Config/Calibración/Voz) | ✅ Completo |
 | Mini overlay al minimizar (gesto + estado de voz) | ✅ Completo |
+| Diagnóstico de gestos crudos/ganadores/descartados | ✅ Completo |
+| Logs JSONL de diagnóstico por sesión | ✅ Completo |
 | Control por mirada estimada | 🔲 Pendiente |
 | Tests automatizados | 🔲 Pendiente |
 
@@ -95,6 +97,108 @@ La ventana principal (`GazeDashApp`) usa una **sidebar fija** con navegación en
 - **Voz**: módulos de activación, sliders de audio, diagnóstico de micrófono y modelos
 
 El **mini overlay** (al minimizar) muestra preview de cámara, gesto detectado y estado del módulo de voz. Es arrastrable.
+
+---
+
+## Gestos más confiables
+
+El flujo de gestos ahora tiene una capa intermedia:
+
+```
+FacialGestureDetector → GestureArbiter → GestureMapper → HotkeyExecutor
+```
+
+`GestureArbiter` reduce confusiones entre gestos parecidos antes de ejecutar acciones:
+
+- Boca: elige entre `mouth_pucker`, `mouth_o` y `mouth_open`.
+- Sonrisa: elige entre `smile`, `smile_left` y `smile_right`.
+- Ojos: elige entre `eye_wide` y `eye_blink`.
+- Cejas: elige entre `brow_raise` y `brow_frown`.
+
+Además aplica estabilidad temporal configurable en `gesture_arbitration`: frames para activar y frames para soltar. Esto evita disparos dobles y parpadeos de un frame.
+
+La configuración base está en `config/default_config.json`:
+
+```json
+"gesture_arbitration": {
+  "enabled": true,
+  "activation_frames": 2,
+  "hold_activation_frames": 1,
+  "release_frames": 2,
+  "hold_release_frames": 1,
+  "activation_frames_by_gesture": {
+    "mouth_o": 3,
+    "smile": 3,
+    "brow_raise": 3,
+    "brow_frown": 3,
+    "eye_blink": 3
+  }
+}
+```
+
+Reglas prácticas para ajustar:
+
+- Si un gesto se activa por accidente, subir su `activation_frames_by_gesture`.
+- Si un gesto se corta por ruido, subir su `release_frames_by_gesture`.
+- Si un gesto se siente lento, bajar sus frames, pero hacerlo de a 1.
+- Para juegos simples, mantener `hold_activation_frames` y `hold_release_frames` bajos para no agregar latencia.
+- Si dos gestos se confunden dentro de un grupo, ajustar `priorities` o directamente quitar acción al gesto menos confiable en ese perfil.
+
+### Diagnóstico en vivo
+
+La vista **Inicio** muestra una tarjeta de diagnóstico junto al gesto activo:
+
+- `Ganador`: gesto filtrado que puede ejecutar una acción.
+- `Crudos`: gestos que el detector facial vio antes del arbitraje.
+- `Descartados`: gestos rechazados por competir con otro gesto del mismo grupo.
+
+Uso recomendado:
+
+- Si `Crudos` muestra varios gestos al hacer uno solo, hay confusión de detector o umbral.
+- Si el gesto correcto aparece en `Crudos` pero no en `Ganador`, ajustar `priorities` o los frames de activación.
+- Si aparece `esperando nombre 1/3`, el gesto está siendo confirmado; bajar frames si se siente lento, subirlos si dispara por accidente.
+- Si un gesto aparece seguido en `Descartados`, conviene quitarle acción en ese perfil o endurecerlo.
+
+### Logs de sesión
+
+GazeDash guarda eventos de diagnóstico en JSONL para revisar confusiones después de usar la app:
+
+```
+logs/gesture_diagnostics/gesture_diagnostics_ui_YYYYMMDD_HHMMSS.jsonl
+```
+
+Cada línea contiene:
+
+- `profile`: perfil activo.
+- `detected_gesture`: gesto filtrado mostrado/ejecutable.
+- `debug.raw_active`: gestos crudos antes del arbitraje.
+- `debug.active`: gestos ganadores.
+- `debug.groups`: candidatos, descartados y frames de activación/liberación por grupo.
+
+La configuración está en `gesture_diagnostics`:
+
+```json
+"gesture_diagnostics": {
+  "enabled": true,
+  "log_dir": "logs/gesture_diagnostics",
+  "min_interval_seconds": 0.25,
+  "only_log_changes": true
+}
+```
+
+Uso recomendado:
+
+- Si un gesto aparece seguido en `raw_active` pero nunca en `active`, revisar prioridades o frames.
+- Si dos gestos aparecen juntos muchas veces, ajustar el grupo conflictivo o eliminar uno del perfil.
+- Si `candidate_frames` no llega al requerido, bajar frames o mejorar calibración.
+- Si el log crece mucho, subir `min_interval_seconds` o dejar `only_log_changes` en `true`.
+
+Próximos pasos recomendados:
+
+1. Agregar puntajes/confianza por gesto, no solo booleanos.
+2. Separar umbral de activación y liberación dentro del detector facial.
+3. Calibrar con ejemplos negativos para aprender confusores.
+4. Crear una herramienta que resuma los logs y sugiera cambios de perfil.
 
 ---
 

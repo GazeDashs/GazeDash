@@ -10,6 +10,8 @@ import customtkinter as ctk
 from PIL import Image, ImageTk
 
 from core.gesture_engine.cooldown_manager import CooldownManager
+from core.gesture_engine.gesture_arbiter import GestureArbiter
+from core.gesture_engine.gesture_diagnostics_logger import GestureDiagnosticsLogger
 from core.gesture_engine.gesture_mapper import map_gesture
 from core.gesture_engine.hotkey_executor import HotkeyExecutor
 from core.voice_control.voice_control import VoiceCommandController
@@ -142,6 +144,8 @@ class GazeDashApp(ctk.CTk):
         self._last_confidence = 0.0
 
         self._gesture_detector    = FacialGestureDetector()
+        self._gesture_arbiter     = GestureArbiter.from_config(self._config)
+        self._gesture_diag_logger = GestureDiagnosticsLogger.from_config(self._config, component="ui")
         self._gesture_executor    = HotkeyExecutor()
         self._voice_controller    = VoiceCommandController(
             self._config, status_callback=self._set_voice_status
@@ -544,11 +548,25 @@ class GazeDashApp(ctk.CTk):
         )
         self._active_action_label.pack(padx=14, pady=6)
 
+        # Diagnóstico de arbitraje
+        diag_card = ctk.CTkFrame(ri, fg_color=CARD, corner_radius=12)
+        diag_card.grid(row=3, column=0, sticky="ew", pady=(0, 12))
+        diag_card.grid_columnconfigure(0, weight=1)
+        _lbl(diag_card, "Diagnóstico", 10, color=TEXT3).grid(
+            row=0, column=0, sticky="w", padx=10, pady=(8, 2)
+        )
+        self._gesture_diag_winner = _lbl(diag_card, "Ganador: —", 11, color=GREEN_TXT, anchor="w")
+        self._gesture_diag_winner.grid(row=1, column=0, sticky="ew", padx=10)
+        self._gesture_diag_raw = _lbl(diag_card, "Crudos: —", 10, color=TEXT2, anchor="w", wraplength=180)
+        self._gesture_diag_raw.grid(row=2, column=0, sticky="ew", padx=10, pady=(2, 0))
+        self._gesture_diag_rejected = _lbl(diag_card, "Descartados: —", 10, color=TEXT2, anchor="w", wraplength=180)
+        self._gesture_diag_rejected.grid(row=3, column=0, sticky="ew", padx=10, pady=(2, 8))
+
         # Métricas faciales
         ctk.CTkFrame(ri, height=1, fg_color=TEXT3).grid(
-            row=3, column=0, sticky="ew", pady=(0, 8)
+            row=4, column=0, sticky="ew", pady=(0, 8)
         )
-        _section_title(ri, "Métricas faciales").grid(row=4, column=0, sticky="w", pady=(0, 6))
+        _section_title(ri, "Métricas faciales").grid(row=5, column=0, sticky="w", pady=(0, 6))
 
         self._metric_rows = {}
         facial_metrics = [
@@ -560,7 +578,7 @@ class GazeDashApp(ctk.CTk):
         ]
         for i, (display, key) in enumerate(facial_metrics):
             row = ctk.CTkFrame(ri, fg_color="transparent")
-            row.grid(row=5 + i, column=0, sticky="ew", pady=2)
+            row.grid(row=6 + i, column=0, sticky="ew", pady=2)
             row.grid_columnconfigure(0, weight=1)
             _lbl(row, display, 12, color=TEXT2).grid(row=0, column=0, sticky="w")
             val = _lbl(row, "0.00", 12, bold=True, color=GREEN_TXT)
@@ -569,16 +587,16 @@ class GazeDashApp(ctk.CTk):
 
         # Módulos
         ctk.CTkFrame(ri, height=1, fg_color=TEXT3).grid(
-            row=10, column=0, sticky="ew", pady=(8, 8)
+            row=11, column=0, sticky="ew", pady=(8, 8)
         )
-        _section_title(ri, "Módulos").grid(row=11, column=0, sticky="w", pady=(0, 6))
+        _section_title(ri, "Módulos").grid(row=12, column=0, sticky="w", pady=(0, 6))
 
         self._mod_rows = {}
         for i, (key, label) in enumerate([("gestos", "Gestos"),
                                            ("mouse",  "Mouse nariz"),
                                            ("voz",    "Voz")]):
             row = ctk.CTkFrame(ri, fg_color="transparent")
-            row.grid(row=12 + i, column=0, sticky="ew", pady=2)
+            row.grid(row=13 + i, column=0, sticky="ew", pady=2)
             row.grid_columnconfigure(0, weight=1)
             _lbl(row, label, 12, color=TEXT2).grid(row=0, column=0, sticky="w")
             dot = _lbl(row, "○ inactivo", 11, color=TEXT3)
@@ -587,13 +605,13 @@ class GazeDashApp(ctk.CTk):
 
         # ── Voz en vivo ───────────────────────────────────────────────────────
         ctk.CTkFrame(ri, height=1, fg_color=TEXT3).grid(
-            row=15, column=0, sticky="ew", pady=(8, 8)
+            row=16, column=0, sticky="ew", pady=(8, 8)
         )
-        _section_title(ri, "Voz en vivo").grid(row=16, column=0, sticky="w", pady=(0, 6))
+        _section_title(ri, "Voz en vivo").grid(row=17, column=0, sticky="w", pady=(0, 6))
 
         # Card de estado
         self._voice_status_card = ctk.CTkFrame(ri, fg_color=CARD, corner_radius=12)
-        self._voice_status_card.grid(row=17, column=0, sticky="ew", pady=(0, 6))
+        self._voice_status_card.grid(row=18, column=0, sticky="ew", pady=(0, 6))
         self._voice_status_card.grid_columnconfigure(0, weight=1)
 
         # Fila icono + estado
@@ -623,7 +641,7 @@ class GazeDashApp(ctk.CTk):
 
         # Advertencia confianza baja
         self._voice_warn_card = ctk.CTkFrame(ri, fg_color="#2D1B00", corner_radius=10)
-        self._voice_warn_card.grid(row=18, column=0, sticky="ew")
+        self._voice_warn_card.grid(row=19, column=0, sticky="ew")
         self._voice_warn_card.grid_remove()  # oculto por defecto
         self._voice_warn_card.grid_columnconfigure(0, weight=1)
         _lbl(self._voice_warn_card, "⚠  Confianza baja — repetí el comando",
@@ -1600,6 +1618,8 @@ class GazeDashApp(ctk.CTk):
     def refresh_state(self, *_):
         self._gesture_executor.release_all_holds()
         self._config    = load_config()
+        self._gesture_arbiter = GestureArbiter.from_config(self._config)
+        self._restart_gesture_diagnostics_logger()
         self._voice_controller.update_config(self._config)
         profile_name    = get_active_profile_name(self._config)
         _, profile      = get_profile_details(self._config, profile_name)
@@ -1637,9 +1657,14 @@ class GazeDashApp(ctk.CTk):
         if hasattr(self, "_voice_module_count_labels"):
             self._refresh_voice_module_counts()
 
+    def _restart_gesture_diagnostics_logger(self):
+        if hasattr(self, "_gesture_diag_logger") and self._gesture_diag_logger is not None:
+            self._gesture_diag_logger.close()
+        self._gesture_diag_logger = GestureDiagnosticsLogger.from_config(self._config, component="ui")
+
     # ── Preview update ────────────────────────────────────────────────────────
 
-    def _update_preview_widgets(self, photo, detected_gesture, face_data=None, mini_photo=None):
+    def _update_preview_widgets(self, photo, detected_gesture, face_data=None, mini_photo=None, gesture_debug=None):
         self._preview_image        = photo
         self._last_detected_gesture = detected_gesture
 
@@ -1660,6 +1685,8 @@ class GazeDashApp(ctk.CTk):
             self._active_action_label.configure(text=f"→  {action_text}")
         else:
             self._active_action_label.configure(text="→  —")
+
+        self._apply_gesture_debug(gesture_debug)
 
         # Métricas faciales
         if face_data and isinstance(face_data, dict):
@@ -1696,6 +1723,38 @@ class GazeDashApp(ctk.CTk):
         # Vista voz — mini preview
         if hasattr(self, "_voz_mini_preview"):
             self._voz_mini_preview.configure(image=photo, text="")
+
+    def _apply_gesture_debug(self, gesture_debug):
+        if not isinstance(gesture_debug, dict) or not hasattr(self, "_gesture_diag_winner"):
+            return
+
+        active = gesture_debug.get("active") or []
+        raw_active = gesture_debug.get("raw_active") or []
+        groups = gesture_debug.get("groups") or {}
+
+        rejected = []
+        waiting = []
+        for group_name, details in groups.items():
+            if not isinstance(details, dict):
+                continue
+            rejected.extend(details.get("rejected") or [])
+            candidate = details.get("candidate")
+            active_winner = details.get("active")
+            if candidate and candidate != active_winner:
+                current = int(details.get("candidate_frames") or 0)
+                required = int(details.get("required_activation_frames") or 0)
+                waiting.append(f"{candidate} {current}/{required}")
+
+        winner_text = ", ".join(active) if active else "—"
+        raw_text = ", ".join(raw_active) if raw_active else "—"
+        rejected_text = ", ".join(dict.fromkeys(rejected)) if rejected else "—"
+
+        if waiting and not active:
+            winner_text = f"esperando {', '.join(waiting[:2])}"
+
+        self._gesture_diag_winner.configure(text=f"Ganador: {winner_text[:42]}")
+        self._gesture_diag_raw.configure(text=f"Crudos: {raw_text[:70]}")
+        self._gesture_diag_rejected.configure(text=f"Descartados: {rejected_text[:64]}")
 
     @staticmethod
     def _direction(dx, dy):
@@ -1871,8 +1930,20 @@ class GazeDashApp(ctk.CTk):
                             0.85,
                         )
 
-                    gestures = self._gesture_detector.detect(face_data)
+                    raw_gestures = self._gesture_detector.detect(face_data)
+                    gestures = self._gesture_arbiter.filter(
+                        raw_gestures,
+                        action_resolver=lambda gesture_name: map_gesture(gesture_name, self._config),
+                    )
+                    gesture_debug = dict(self._gesture_arbiter.last_debug)
                     _, detected_gesture = self._summarize_input(gestures)
+                    diag_logger = self._gesture_diag_logger
+                    if diag_logger is not None:
+                        diag_logger.record(
+                            gesture_debug,
+                            profile_name=get_active_profile_name(self._config),
+                            detected_gesture=detected_gesture,
+                        )
 
                     if self._controller_active and not self._controller_paused:
                         self._handle_gestures(gestures)
@@ -1904,8 +1975,8 @@ class GazeDashApp(ctk.CTk):
 
                 self.after(
                     0,
-                    lambda p=photo, mp=mini_photo, g=detected_gesture, f=fd:
-                        self._update_preview_widgets(p, g, f, mp),
+                    lambda p=photo, mp=mini_photo, g=detected_gesture, f=fd, gd=gesture_debug:
+                        self._update_preview_widgets(p, g, f, mp, gd),
                 )
 
         self._preview_thread = threading.Thread(target=worker, daemon=True)
@@ -1913,6 +1984,9 @@ class GazeDashApp(ctk.CTk):
 
     def stop_camera_preview(self):
         self._gesture_executor.release_all_holds()
+        if hasattr(self, "_gesture_diag_logger") and self._gesture_diag_logger is not None:
+            self._gesture_diag_logger.close()
+            self._gesture_diag_logger = None
         self._preview_stop_event.set()
         if self._camera is not None:
             close_camera(self._camera)

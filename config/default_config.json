@@ -147,6 +147,140 @@
         "smoothing": 0.2,
         "center": null
       }
+    },
+    "accesibilidad_pc": {
+      "display_name": "Accesibilidad PC",
+      "description": "Perfil para tareas basicas de escritorio: mover cursor con nariz, avanzar controles, activar, volver y desplazarse.",
+      "gesture_thresholds": {
+        "mouth_pucker": 0.5,
+        "mouth_open": 0.6,
+        "mouth_funnel": 0.5,
+        "smile": 0.5,
+        "smile_left": 0.5,
+        "smile_right": 0.5,
+        "brow_raise": 0.5,
+        "brow_frown": 0.4,
+        "eye_blink": 0.7,
+        "eye_wide": 0.6,
+        "nose_sneer": 0.4,
+        "mouth_conflict_margin": 0.05
+      },
+      "gesture_actions": {
+        "smile_right": {
+          "type": "hotkey",
+          "keys": ["tab"],
+          "label": "Siguiente control"
+        },
+        "smile_left": {
+          "type": "hotkey",
+          "keys": ["shift", "tab"],
+          "label": "Control anterior"
+        },
+        "mouth_open": {
+          "type": "hotkey",
+          "keys": ["enter"],
+          "label": "Activar"
+        },
+        "mouth_pucker": {
+          "type": "hotkey",
+          "keys": ["esc"],
+          "label": "Volver"
+        },
+        "eye_wide": {
+          "type": "mouse_click",
+          "button": "left",
+          "label": "Click"
+        },
+        "nose_sneer": {
+          "type": "mouse_double_click",
+          "button": "left",
+          "label": "Doble click"
+        },
+        "brow_raise": {
+          "type": "hotkey",
+          "keys": ["pageup"],
+          "label": "Subir pagina"
+        },
+        "brow_frown": {
+          "type": "hotkey",
+          "keys": ["pagedown"],
+          "label": "Bajar pagina"
+        },
+        "smile": {
+          "type": "hotkey",
+          "keys": ["ctrl", "l"],
+          "label": "Ir a barra"
+        }
+      },
+      "mouse_settings": {
+        "enabled": true,
+        "dead_zone": 22.0,
+        "max_speed": 32.0,
+        "smoothing": 0.24,
+        "center": null
+      }
+    },
+    "juego_simple": {
+      "display_name": "Juego simple",
+      "description": "Perfil para juegos sencillos: gestos laterales sostienen flechas, cejas sostienen arriba/abajo y boca ejecuta salto o confirmar.",
+      "gesture_thresholds": {
+        "mouth_pucker": 0.5,
+        "mouth_open": 0.6,
+        "mouth_funnel": 0.5,
+        "smile": 0.5,
+        "smile_left": 0.5,
+        "smile_right": 0.5,
+        "brow_raise": 0.5,
+        "brow_frown": 0.4,
+        "eye_blink": 0.7,
+        "eye_wide": 0.6,
+        "nose_sneer": 0.4,
+        "mouth_conflict_margin": 0.05
+      },
+      "gesture_actions": {
+        "smile_left": {
+          "type": "key_hold",
+          "keys": ["left"],
+          "label": "Mantener izquierda"
+        },
+        "smile_right": {
+          "type": "key_hold",
+          "keys": ["right"],
+          "label": "Mantener derecha"
+        },
+        "brow_raise": {
+          "type": "key_hold",
+          "keys": ["up"],
+          "label": "Mantener arriba"
+        },
+        "brow_frown": {
+          "type": "key_hold",
+          "keys": ["down"],
+          "label": "Mantener abajo"
+        },
+        "mouth_pucker": {
+          "type": "hotkey",
+          "keys": ["space"],
+          "label": "Saltar"
+        },
+        "mouth_open": {
+          "type": "hotkey",
+          "keys": ["enter"],
+          "label": "Confirmar"
+        },
+        "eye_wide": {
+          "type": "hotkey",
+          "keys": ["esc"],
+          "label": "Pausa"
+        }
+      },
+      "mouse_settings": {
+        "enabled": false,
+        "dead_zone": 25.0,
+        "max_speed": 35.0,
+        "smoothing": 0.2,
+        "center": null
+      }
     }
   }
 }

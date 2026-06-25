@@ -128,10 +128,9 @@ class FacialGestureDetector:
         profiles = config.get("profiles", {}) if isinstance(config, dict) else {}
         profile = profiles.get(profile_name, {}) if isinstance(profiles, dict) else {}
 
-        gesture_thresholds = {}
+        gesture_thresholds = dict(config.get("gesture_thresholds", {}) or {})
         if isinstance(profile, dict):
             gesture_thresholds.update(profile.get("gesture_thresholds", {}))
-        gesture_thresholds.update(config.get("gesture_thresholds", {}))
 
         return FacialGestureThresholds(
             mouth_pucker=float(gesture_thresholds.get("mouth_pucker", FacialGestureThresholds.mouth_pucker)),
@@ -362,11 +361,19 @@ class FacialGestureDetector:
             # If blink/squint is active, ignore brow_raise to avoid false positives.
             "brow_raise": (
                 not eye_blink_active
-                and metrics.get("brow_middle_up", 0.0)
-                >= self._neutral_value("brow_middle_up") + self._scaled_threshold("brow_raise", self.thresholds.brow_raise)
+                and (
+                    metrics.get("brow_inner_up", 0.0)
+                    >= self._neutral_value("brow_inner_up")
+                    + self._scaled_threshold("brow_raise", self.thresholds.brow_raise)
+                    or metrics.get("brow_ratio", 0.0)
+                    >= self._neutral_value("brow_ratio") + self.GEOMETRY_DELTAS["brow_raise"]
+                )
             ),
             "brow_frown": (
-                metrics.get("brow_inner_down", 0.0) >= self._neutral_value("brow_inner_down") + self._scaled_threshold("brow_frown", self.thresholds.brow_frown)
+                metrics.get("brow_down_left", 0.0)
+                >= self._neutral_value("brow_down_left") + self._scaled_threshold("brow_frown", self.thresholds.brow_frown)
+                or metrics.get("brow_down_right", 0.0)
+                >= self._neutral_value("brow_down_right") + self._scaled_threshold("brow_frown", self.thresholds.brow_frown)
             ),
             "eye_blink": eye_blink_active,
             "eye_wide": (

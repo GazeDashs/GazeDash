@@ -15,10 +15,11 @@ GazeDash es una **aplicación funcional** con UI completa, detección facial en 
 | App de escritorio (CustomTkinter) | ✅ Completo |
 | Detección facial con MediaPipe (landmarks + blendshapes) | ✅ Completo |
 | Gestos faciales: boca, sonrisa, cejas, guiño, nariz | ✅ Funcional (ajuste en curso) |
-| Mapeo gesto → hotkey por perfil | ✅ Completo |
+| Mapeo gesto → hotkey/clic/tecla sostenida por perfil | ✅ Completo |
 | Mouse por nariz (joystick relativo, recalibrable) | ✅ Completo |
 | Clic izquierdo/derecho por guiño | ✅ Funcional |
 | Sistema de perfiles (gestos + umbrales + voz + mouse) | ✅ Completo |
+| Perfiles base: Accesibilidad PC y Juego simple | ✅ Completo |
 | Calibración de umbrales — vista embebida con sliders | ✅ Completo |
 | Control de voz — arquitectura ML con máquina de estados | ✅ Integrado (requiere modelos) |
 | Feedback visual de voz en tiempo real | ✅ Completo |
@@ -117,7 +118,6 @@ Requiere modelo de activación + modelos de comando por módulo (`.pkl` en `asse
 | P0 | Validar carga de modelos de voz en entorno limpio |
 | P0 | Suite mínima de tests (config, gestos, hotkeys) |
 | P1 | Hacer configurable el umbral de clic por guiño desde perfil |
-| P1 | Revisar nombres internos de métricas `brow_raise`/`brow_frown` |
 | P2 | Implementar o retirar `activation_word` de voz |
 | P2 | Medición formal de latencia y consumo de CPU |
 | P3 | Estimación de mirada real y calibración de pantalla |

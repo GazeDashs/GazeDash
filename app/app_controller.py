@@ -113,6 +113,7 @@ class AppController:
                 if key in (ord("-"), ord("_")) or key == 84:  # - or DOWN arrow
                     self._selected_landmark_idx = (self._selected_landmark_idx - 1) % len(self._editable_landmarks)
         finally:
+            self.gesture_executor.release_all_holds()
             close_camera(self.cap)
             self.face_detector.close()
             self.voice_controller.stop()
@@ -168,18 +169,31 @@ class AppController:
             )
     def _handle_gestures(self, gestures):
         if not gestures or not gestures.get("has_face"):
+            self.gesture_executor.release_all_holds()
             return
 
         if gestures.get("calibrating"):
+            self.gesture_executor.release_all_holds()
             return
 
         for gesture_name, is_active in gestures.items():
-            if gesture_name in self._GESTURE_META_KEYS or not is_active:
+            if gesture_name in self._GESTURE_META_KEYS:
                 continue
 
-            action = map_gesture(gesture_name)
+            action = map_gesture(gesture_name, self.config)
             if not action:
-                print(f"Gesto activo sin mapeo: {gesture_name}")
+                if is_active:
+                    print(f"Gesto activo sin mapeo: {gesture_name}")
+                continue
+
+            if self.gesture_executor.is_hold_action(action):
+                try:
+                    self.gesture_executor.update_hold(gesture_name, action, bool(is_active))
+                except RuntimeError as exc:
+                    print(f"No se pudo mantener la accion para {gesture_name}: {exc}")
+                continue
+
+            if not is_active:
                 continue
 
             # usa label o nombre de gesto como clave de cooldown

@@ -72,10 +72,9 @@ def get_profile_details(config, profile_name=None):
 
 def get_effective_thresholds(config, profile_name=None):
     _, profile = get_profile_details(config, profile_name)
-    thresholds = {}
+    thresholds = dict(config.get("gesture_thresholds", {}) or {})
     if isinstance(profile, dict):
         thresholds.update(profile.get("gesture_thresholds", {}) or {})
-    thresholds.update(config.get("gesture_thresholds", {}) or {})
     return thresholds
 
 
@@ -219,15 +218,20 @@ def set_profile_gesture_action(config, profile_name, gesture_name, *, keys=None,
         return updated
 
     key_list = list(keys or [])
-    if not key_list:
+    if not key_list and action_type not in {"mouse_click", "mouse_double_click"}:
         gesture_actions.pop(gesture_key, None)
         return updated
 
-    gesture_actions[gesture_key] = {
+    action_payload = {
         "type": action_type,
-        "keys": key_list,
         "label": label.strip() if isinstance(label, str) and label.strip() else gesture_key,
     }
+    if action_type in {"mouse_click", "mouse_double_click"}:
+        action_payload["button"] = "left"
+    else:
+        action_payload["keys"] = key_list
+
+    gesture_actions[gesture_key] = action_payload
 
     updated["active_profile"] = profile_name
     return updated

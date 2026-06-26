@@ -78,7 +78,7 @@ Requiere Python ≥ 3.10 y las dependencias de `requirements.txt`.
 
 ```
 opencv-python, mediapipe, customtkinter, numpy
-pyautogui, Pillow
+pydirectinput, Pillow
 librosa, sounddevice, soundfile       # voz
 scikit-learn, xgboost, pandas, joblib # modelos ML de voz
 imbalanced-learn

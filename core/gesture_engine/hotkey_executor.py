@@ -4,25 +4,25 @@ from typing import Any, Dict, Iterable, Optional
 
 
 class HotkeyExecutor:
-    """Ejecuta acciones por medio de gestos mapeados a hotkeys usando pyautogui."""
+    """Ejecuta acciones por medio de gestos mapeados a hotkeys usando pydirectinput."""
 
     def __init__(self):
-        self._pyautogui = None
+        self._pydirectinput = None
         self._held_actions: dict[str, tuple[str, ...]] = {}
 
-    def _get_pyautogui(self):
-        if self._pyautogui is not None:
-            return self._pyautogui
+    def _get_pydirectinput(self):
+        if self._pydirectinput is not None:
+            return self._pydirectinput
 
         try:
-            import pyautogui
+            import pydirectinput
         except ImportError as exc:
             raise RuntimeError(
-                "pyautogui no esta instalado. Instala la dependencia para poder enviar hotkeys."
+                "pydirectinput no esta instalado. Instala la dependencia para poder enviar hotkeys a juegos."
             ) from exc
 
-        self._pyautogui = pyautogui
-        return pyautogui
+        self._pydirectinput = pydirectinput
+        return pydirectinput
 
     @staticmethod
     def _normalize_keys(keys: Any) -> Optional[Iterable[str]]:
@@ -59,12 +59,12 @@ class HotkeyExecutor:
         if not key_tuple:
             return False
 
-        pyautogui = self._get_pyautogui()
+        pydirectinput = self._get_pydirectinput()
         is_held = action_id in self._held_actions
 
         if active and not is_held:
             for key in key_tuple:
-                pyautogui.keyDown(key)
+                pydirectinput.keyDown(key)
             self._held_actions[action_id] = key_tuple
             return True
 
@@ -79,9 +79,9 @@ class HotkeyExecutor:
         if not keys:
             return False
 
-        pyautogui = self._get_pyautogui()
+        pydirectinput = self._get_pydirectinput()
         for key in reversed(keys):
-            pyautogui.keyUp(key)
+            pydirectinput.keyUp(key)
         return True
 
     def release_all_holds(self) -> bool:
@@ -99,14 +99,14 @@ class HotkeyExecutor:
         if action_type == "key_hold":
             return False
 
-        pyautogui = self._get_pyautogui()
+        pydirectinput = self._get_pydirectinput()
 
         if action_type == "mouse_click":
-            pyautogui.click(button=str(action.get("button") or "left"))
+            pydirectinput.click(button=str(action.get("button") or "left"))
             return True
 
         if action_type == "mouse_double_click":
-            pyautogui.doubleClick(button=str(action.get("button") or "left"))
+            pydirectinput.doubleClick(button=str(action.get("button") or "left"))
             return True
 
         keys = self._normalize_keys(action.get("keys") if isinstance(action, dict) else None)
@@ -115,7 +115,10 @@ class HotkeyExecutor:
 
         key_list = tuple(keys)
         if len(key_list) == 1:
-            pyautogui.press(key_list[0])
+            pydirectinput.press(key_list[0])
         else:
-            pyautogui.hotkey(*key_list)
+            for key in key_list:
+                pydirectinput.keyDown(key)
+            for key in reversed(key_list):
+                pydirectinput.keyUp(key)
         return True

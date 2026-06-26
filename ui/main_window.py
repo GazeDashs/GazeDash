@@ -653,7 +653,7 @@ class GazeDashApp(ctk.CTk):
         """Vista embebida de configuración con tabs: Gestos, Perfiles, Mouse."""
         from ui.settings_store import (
             AVAILABLE_GESTURE_NAMES, GESTURE_THRESHOLD_KEYS,
-            clone_profile, get_profile_actions, get_profile_voice_actions,
+            clone_profile, rename_profile, get_profile_actions, get_profile_voice_actions,
             parse_hotkey_spec, remove_profile_gesture_action, remove_profile_voice_action,
             set_general_settings, set_profile_gesture_action, set_profile_mouse_settings,
             set_profile_thresholds, set_profile_voice_action,
@@ -847,14 +847,25 @@ class GazeDashApp(ctk.CTk):
         _section_title(p_scroll, "Perfil activo").grid(row=0, column=0, sticky="w", pady=(0, 8))
 
         # Selector de perfil
+        profile_sel_row = ctk.CTkFrame(p_scroll, fg_color="transparent")
+        profile_sel_row.grid(row=1, column=0, sticky="ew", pady=(0, 12))
+        profile_sel_row.grid_columnconfigure(0, weight=1)
+
         cfg_profile_sel = ctk.CTkOptionMenu(
-            p_scroll,
+            profile_sel_row,
             values=list(get_profiles(cfg_state["config"]).keys()),
             font=("Segoe UI", 12), fg_color=CARD, button_color=GREEN,
             dropdown_fg_color=CARD,
         )
         cfg_profile_sel.set(get_active_profile_name(cfg_state["config"]))
-        cfg_profile_sel.grid(row=1, column=0, sticky="ew", pady=(0, 12))
+        cfg_profile_sel.grid(row=0, column=0, sticky="ew", padx=(0, 8))
+
+        ctk.CTkButton(
+            profile_sel_row, text="✏ Renombrar", width=90,
+            fg_color=CARD, text_color=TEXT, hover_color=TEXT3,
+            font=("Segoe UI", 11, "bold"), corner_radius=8,
+            command=lambda: rename_current_profile(),
+        ).grid(row=0, column=1)
 
         # Info del perfil
         self._cfg_profile_info = _lbl(p_scroll, "—", 12, color=TEXT2)
@@ -890,6 +901,33 @@ class GazeDashApp(ctk.CTk):
             box.delete("1.0", "end")
             box.insert("1.0", text)
             box.configure(state="disabled")
+
+        def rename_current_profile():
+            old_name = cfg_profile_sel.get()
+            dialog = ctk.CTkInputDialog(text=f"Ingresa el nuevo nombre para el perfil '{old_name}':", title="Renombrar perfil")
+            new_name = dialog.get_input()
+            if not new_name: return
+            new_name = new_name.strip()
+            if not new_name or new_name == old_name: return
+            if new_name in get_profiles(cfg_state["config"]):
+                messagebox.showwarning("GazeDash", "Ya existe ese perfil."); return
+            
+            updated = rename_profile(cfg_state["config"], old_name, new_name)
+            save_config(updated)
+            cfg_state["config"] = updated
+            self._config = updated
+            if hasattr(self, "_hotkey_executor"):
+                self._hotkey_executor.update_config(self._config)
+            if hasattr(self, "_voice_controller"):
+                self._voice_controller.update_config(self._config)
+            if hasattr(self, "_mouse_driver"):
+                self._mouse_driver.update_config(self._config)
+            self.refresh_state()
+            profiles = list(get_profiles(updated).keys())
+            cfg_profile_sel.configure(values=profiles)
+            cfg_profile_sel.set(new_name)
+            refresh_right_panel(new_name)
+            messagebox.showinfo("GazeDash", f"Perfil renombrado a: '{new_name}'.")
 
         def create_profile():
             name = new_profile_entry.get().strip()
@@ -1146,9 +1184,22 @@ class GazeDashApp(ctk.CTk):
             cfg_profile_sel.configure(values=list(profiles_dict.keys()))
             cfg_profile_sel.set(profile_name)
 
+        def activate_profile(profile_name):
+            cfg_state["config"]["active_profile"] = profile_name
+            save_config(cfg_state["config"])
+            self._config = cfg_state["config"]
+            if hasattr(self, "_hotkey_executor"):
+                self._hotkey_executor.update_config(self._config)
+            if hasattr(self, "_voice_controller"):
+                self._voice_controller.update_config(self._config)
+            if hasattr(self, "_mouse_driver"):
+                self._mouse_driver.update_config(self._config)
+            self.refresh_state()
+            refresh_right_panel(profile_name)
+
         # Wire profile selector
         cfg_profile_sel.configure(
-            command=lambda v: refresh_right_panel(v)
+            command=lambda v: activate_profile(v)
         )
 
         # Initial load

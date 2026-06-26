@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import numpy as np
 
-from .audio_features import FEATURE_COLUMNS_V3, TARGET_SR, extract_features_v3, preprocess_audio_array
+from .audio_features import FEATURE_COLUMNS_V3_FINAL, TARGET_SR, extract_features_v3, preprocess_audio_array
 
 try:
     import joblib
@@ -28,12 +28,17 @@ class VoiceModelLoadError(RuntimeError):
 
 
 class VoiceCommandModel:
-    """Carga y ejecuta un modelo de comandos de voz.
+    """Carga y ejecuta un modelo de comandos de voz (XGBoost + SMOTE).
 
-    Soporta el formato nuevo exportado desde el notebook:
-    {"model", "scaler", "features", "label_encoder", ...}
-    y conserva un fallback para estimadores sklearn directos.
+    Soporta el formato exportado desde el notebook nuevo:
+    {"model", "scaler", "features", "le"}   <- clave 'le' (LabelEncoder)
+
+    y mantiene compatibilidad con el formato anterior:
+    {"model", "scaler", "features", "label_encoder"}
     """
+
+    # Claves donde puede estar el LabelEncoder según versión del notebook
+    _LE_KEYS = ("le", "label_encoder")
 
     def __init__(self, model_path: Path):
         self.model_path = Path(model_path)
@@ -68,10 +73,28 @@ class VoiceCommandModel:
         if not isinstance(self.pipeline, dict):
             return
 
-        required = {"model", "scaler", "features", "label_encoder"}
+        required = {"model", "scaler", "features"}
         missing = sorted(required - set(self.pipeline.keys()))
         if missing:
-            raise VoiceModelLoadError(f"Modelo {self.model_path} incompleto. Faltan claves: {', '.join(missing)}")
+            raise VoiceModelLoadError(
+                f"Modelo {self.model_path} incompleto. Faltan claves: {', '.join(missing)}"
+            )
+
+        # Verificar que existe al menos una de las claves del LabelEncoder
+        if not any(k in self.pipeline for k in self._LE_KEYS):
+            raise VoiceModelLoadError(
+                f"Modelo {self.model_path} no contiene LabelEncoder "
+                f"(se buscó: {', '.join(self._LE_KEYS)})"
+            )
+
+    def _get_label_encoder(self) -> Any:
+        """Devuelve el LabelEncoder sin importar con qué clave fue guardado."""
+        for key in self._LE_KEYS:
+            if key in self.pipeline:
+                return self.pipeline[key]
+        raise VoiceModelLoadError(
+            f"LabelEncoder no encontrado en el modelo {self.model_path}"
+        )
 
     def predict_from_audio(
         self,
@@ -102,17 +125,20 @@ class VoiceCommandModel:
             ) from exc
 
         features_array = np.asarray(features, dtype=np.float32).reshape(1, -1)
-        features_df = pd.DataFrame(features_array, columns=FEATURE_COLUMNS_V3)
+        features_df = pd.DataFrame(features_array, columns=FEATURE_COLUMNS_V3_FINAL)
 
         selected_features = list(self.pipeline["features"])
         missing = [name for name in selected_features if name not in features_df.columns]
         if missing:
-            raise RuntimeError(f"Features requeridas no generadas para {self.name}: {', '.join(missing[:5])}")
+            raise RuntimeError(
+                f"Features requeridas no generadas para {self.name}: {', '.join(missing[:5])}"
+            )
 
         X_selected = features_df[selected_features]
         X_scaled = self.pipeline["scaler"].transform(X_selected)
+
         model = self.pipeline["model"]
-        label_encoder = self.pipeline["label_encoder"]
+        label_encoder = self._get_label_encoder()
 
         prediction_raw = model.predict(X_scaled)
         prediction_value = prediction_raw[0] if hasattr(prediction_raw, "__getitem__") else prediction_raw
@@ -120,7 +146,7 @@ class VoiceCommandModel:
         try:
             label = label_encoder.inverse_transform([int(prediction_value)])[0]
         except Exception:
-            label = prediction_value
+            label = str(prediction_value)
 
         probabilities = None
         confidence = 1.0

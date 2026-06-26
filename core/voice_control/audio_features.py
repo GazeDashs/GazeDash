@@ -1,53 +1,55 @@
-"""Extraccion de features compatible con los modelos de voz entrenados.
+"""Extraccion de features compatible con los modelos de voz entrenados (V3 Final).
 
-El formato replica el notebook `Copia_de_Modulo_de_Habla_Mejorado.ipynb`:
-audio mono a 16 kHz, 1 segundo de duracion y vector tabular de 236 features.
+El formato replica exactamente create_feature_names_v3_final y extract_features_v3_final
+del notebook de entrenamiento:
+- Audio a 22050 Hz
+- 3 segmentos temporales con MFCC(20) + deltas + features espectrales
+- 2 features globales
+- Vector tabular de 275 features
 """
 
 from __future__ import annotations
 
-from typing import Iterable
-
 import numpy as np
 
-
-TARGET_SR = 16000
-TARGET_LENGTH = 16000
+TARGET_SR = 22050
+TARGET_LENGTH = 22050  # 1 segundo a 22050 Hz
 TARGET_DUR = 1.0
+N_SEGMENTS = 3
 
 
-def create_feature_names_v3(n_mels: int = 128) -> list[str]:
-    names = []
-    for i in range(1, 27):
-        names.append(f"mfcc_{i}_mean")
-    for i in range(1, 27):
-        names.append(f"mfcc_{i}_std")
-    for i in range(1, 27):
-        names.append(f"delta_mfcc_{i}_mean")
-    for i in range(1, 13):
-        names.append(f"chroma_{i}")
-    for i in range(1, n_mels + 1):
-        names.append(f"mel_{i}")
-    names.extend(["zcr_mean", "zcr_std"])
-    for i in range(1, 8):
-        names.append(f"contrast_{i}")
-    names.extend(
-        [
-            "centroid_mean",
-            "centroid_std",
-            "rolloff_mean",
-            "rolloff_std",
-            "flatness_mean",
-            "bandwidth_mean",
-            "rms_mean",
-            "rms_std",
-            "rms_max",
-        ]
-    )
+def create_feature_names_v3_final(n_segments: int = N_SEGMENTS, n_mfcc: int = 20) -> list[str]:
+    """Genera los 275 nombres de features en el orden exacto del notebook."""
+    names: list[str] = []
+
+    for s in range(n_segments):
+        part = f"seg{s + 1}"
+
+        for i in range(1, n_mfcc + 1):
+            names.append(f"mfcc_{i}_mean_{part}")
+        for i in range(1, n_mfcc + 1):
+            names.append(f"mfcc_{i}_std_{part}")
+        for i in range(1, n_mfcc + 1):
+            names.append(f"delta_mfcc_{i}_{part}")
+        for i in range(1, n_mfcc + 1):
+            names.append(f"delta2_mfcc_{i}_{part}")
+
+        names.extend([
+            f"centroid_mean_{part}", f"centroid_std_{part}",
+            f"rolloff_mean_{part}", f"rolloff_std_{part}",
+            f"bandwidth_{part}",
+            f"flatness_{part}",
+            f"rms_mean_{part}", f"rms_std_{part}", f"rms_max_{part}",
+            f"zcr_mean_{part}", f"zcr_std_{part}",
+        ])
+
+    names.extend(["global_flatness", "global_mfcc_mean"])
     return names
 
 
-FEATURE_COLUMNS_V3 = create_feature_names_v3(n_mels=128)
+FEATURE_COLUMNS_V3_FINAL = create_feature_names_v3_final()
+# Alias para compatibilidad con cualquier import existente
+FEATURE_COLUMNS_V3 = FEATURE_COLUMNS_V3_FINAL
 
 
 def _require_librosa():
@@ -61,7 +63,7 @@ def _require_librosa():
 
 
 def preprocess_audio_array(audio: np.ndarray, sample_rate: int, gain: float = 1.0) -> np.ndarray:
-    """Normaliza, resamplea, recorta silencios y ajusta el audio a 1 segundo."""
+    """Normaliza, resamplea, recorta silencios y ajusta el audio a 1 segundo a 22050 Hz."""
     librosa = _require_librosa()
 
     if audio is None:
@@ -88,7 +90,7 @@ def preprocess_audio_array(audio: np.ndarray, sample_rate: int, gain: float = 1.
 
     if len(audio) > TARGET_LENGTH:
         start = max(0, (len(audio) - TARGET_LENGTH) // 2)
-        audio = audio[start : start + TARGET_LENGTH]
+        audio = audio[start: start + TARGET_LENGTH]
 
     if len(audio) < TARGET_LENGTH:
         pad_total = TARGET_LENGTH - len(audio)
@@ -100,7 +102,14 @@ def preprocess_audio_array(audio: np.ndarray, sample_rate: int, gain: float = 1.
 
 
 def extract_features_v3(audio: np.ndarray, sample_rate: int = TARGET_SR) -> np.ndarray:
-    """Devuelve el vector de 236 features usado por los modelos `*_pipeline.pkl`."""
+    """
+    Extrae el vector de 275 features usado por los modelos nuevos (XGBoost + SMOTE).
+
+    Replica exactamente extract_features_v3_final del notebook:
+    - 3 segmentos: MFCC(20) mean+std, delta mean, delta2 mean,
+      centroid, rolloff, bandwidth, flatness, rms, zcr
+    - 2 features globales: global_flatness, global_mfcc_mean
+    """
     librosa = _require_librosa()
 
     audio = np.asarray(audio, dtype=np.float32)
@@ -112,71 +121,77 @@ def extract_features_v3(audio: np.ndarray, sample_rate: int = TARGET_SR) -> np.n
         sample_rate = TARGET_SR
 
     features: list[float] = []
-    n_samples = len(audio)
-    n_fft = min(n_samples, 1024)
-    hop_length = max(1, n_fft // 4)
+    total_len = len(audio)
+    segment_length = total_len // N_SEGMENTS
 
-    mfccs = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=26, n_fft=n_fft, hop_length=hop_length)
-    features.extend(np.mean(mfccs, axis=1))
-    features.extend(np.std(mfccs, axis=1))
+    if segment_length < 1600:
+        segment_length = max(1600, total_len // 2)
 
-    delta_mfcc = librosa.feature.delta(mfccs)
-    features.extend(np.mean(delta_mfcc, axis=1))
+    for i in range(N_SEGMENTS):
+        start = i * segment_length
+        end = min((i + 1) * segment_length, total_len)
+        segment = audio[start:end]
 
-    chroma = librosa.feature.chroma_stft(y=audio, sr=sample_rate, n_fft=n_fft, hop_length=hop_length)
-    features.extend(np.mean(chroma, axis=1))
+        if len(segment) < 1024:
+            segment = np.pad(segment, (0, 1024 - len(segment)))
 
-    n_mels = min(128, n_fft // 2 + 1)
-    mel = librosa.feature.melspectrogram(
-        y=audio,
-        sr=sample_rate,
-        n_fft=n_fft,
-        hop_length=hop_length,
-        n_mels=n_mels,
-    )
-    mel_db = librosa.power_to_db(mel)
-    mel_features = np.mean(mel_db, axis=1)
-    features.extend(_pad_to_length(mel_features, 128))
+        n_fft = min(len(segment), 1024)
+        hop_length = max(1, n_fft // 4)
 
-    zcr = librosa.feature.zero_crossing_rate(audio, hop_length=hop_length)
-    features.append(float(np.mean(zcr)))
-    features.append(float(np.std(zcr)))
+        # MFCC + deltas
+        mfcc = librosa.feature.mfcc(
+            y=segment, sr=sample_rate, n_mfcc=20, n_fft=n_fft, hop_length=hop_length
+        )
+        delta = librosa.feature.delta(mfcc)
+        delta2 = librosa.feature.delta(mfcc, order=2)
 
-    try:
-        contrast = librosa.feature.spectral_contrast(y=audio, sr=sample_rate, n_fft=n_fft, hop_length=hop_length)
-        features.extend(np.mean(contrast, axis=1))
-    except Exception:
-        features.extend([0.0] * 7)
+        features.extend(np.mean(mfcc, axis=1))       # mfcc_i_mean_segN  (20)
+        features.extend(np.std(mfcc, axis=1))        # mfcc_i_std_segN   (20)
+        features.extend(np.mean(delta, axis=1))      # delta_mfcc_i_segN (20)
+        features.extend(np.mean(delta2, axis=1))     # delta2_mfcc_i_segN(20)
 
-    centroid = librosa.feature.spectral_centroid(y=audio, sr=sample_rate, n_fft=n_fft, hop_length=hop_length)
-    features.append(float(np.mean(centroid)))
-    features.append(float(np.std(centroid)))
+        # Espectrales
+        centroid = librosa.feature.spectral_centroid(
+            y=segment, sr=sample_rate, n_fft=n_fft, hop_length=hop_length
+        )
+        features.append(float(np.mean(centroid)))    # centroid_mean_segN
+        features.append(float(np.std(centroid)))     # centroid_std_segN
 
-    rolloff = librosa.feature.spectral_rolloff(y=audio, sr=sample_rate, n_fft=n_fft, hop_length=hop_length)
-    features.append(float(np.mean(rolloff)))
-    features.append(float(np.std(rolloff)))
+        rolloff = librosa.feature.spectral_rolloff(
+            y=segment, sr=sample_rate, n_fft=n_fft, hop_length=hop_length
+        )
+        features.append(float(np.mean(rolloff)))     # rolloff_mean_segN
+        features.append(float(np.std(rolloff)))      # rolloff_std_segN
 
-    flatness = librosa.feature.spectral_flatness(y=audio, n_fft=n_fft, hop_length=hop_length)
-    features.append(float(np.mean(flatness)))
+        bandwidth = librosa.feature.spectral_bandwidth(
+            y=segment, sr=sample_rate, n_fft=n_fft, hop_length=hop_length
+        )
+        features.append(float(np.mean(bandwidth)))   # bandwidth_segN
 
-    bandwidth = librosa.feature.spectral_bandwidth(y=audio, sr=sample_rate, n_fft=n_fft, hop_length=hop_length)
-    features.append(float(np.mean(bandwidth)))
+        flatness = librosa.feature.spectral_flatness(
+            y=segment, n_fft=n_fft, hop_length=hop_length
+        )
+        features.append(float(np.mean(flatness)))    # flatness_segN
 
-    rms = librosa.feature.rms(y=audio, hop_length=hop_length)
-    features.append(float(np.mean(rms)))
-    features.append(float(np.std(rms)))
-    features.append(float(np.max(rms)))
+        # Energía
+        rms = librosa.feature.rms(y=segment, hop_length=hop_length)
+        features.append(float(np.mean(rms)))         # rms_mean_segN
+        features.append(float(np.std(rms)))          # rms_std_segN
+        features.append(float(np.max(rms)))          # rms_max_segN
+
+        zcr = librosa.feature.zero_crossing_rate(y=segment, hop_length=hop_length)
+        features.append(float(np.mean(zcr)))         # zcr_mean_segN
+        features.append(float(np.std(zcr)))          # zcr_std_segN
+
+    # Features globales
+    global_mfcc = librosa.feature.mfcc(y=audio, sr=sample_rate, n_mfcc=13)
+    features.append(float(np.mean(librosa.feature.spectral_flatness(y=audio))))  # global_flatness
+    features.append(float(np.mean(global_mfcc)))                                  # global_mfcc_mean
 
     result = np.asarray(features, dtype=np.float32)
-    if len(result) != len(FEATURE_COLUMNS_V3):
+    if len(result) != len(FEATURE_COLUMNS_V3_FINAL):
         raise RuntimeError(
-            f"Vector de features incompatible: {len(result)} generado, {len(FEATURE_COLUMNS_V3)} esperado."
+            f"Vector de features incompatible: {len(result)} generado, "
+            f"{len(FEATURE_COLUMNS_V3_FINAL)} esperado."
         )
     return result
-
-
-def _pad_to_length(values: Iterable[float], expected_length: int) -> list[float]:
-    padded = list(values)
-    if len(padded) < expected_length:
-        padded.extend([0.0] * (expected_length - len(padded)))
-    return padded[:expected_length]

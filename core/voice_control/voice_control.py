@@ -207,6 +207,8 @@ class VoiceCommandController:
             try:
                 self._process_audio(audio)
             except Exception as exc:
+                import traceback
+                traceback.print_exc()
                 self._set_state(VoiceControlState.ERROR, f"Error procesando audio: {exc}")
             finally:
                 self._listening = False

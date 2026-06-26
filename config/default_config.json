@@ -7,7 +7,10 @@
     "mode": "realtime",
     "realtime_confidence": 0.85,
     "realtime_margin": 0.15,
-    "realtime_action_types": ["hotkey", "key_hold"],
+    "realtime_action_types": [
+      "hotkey",
+      "key_hold"
+    ],
     "activation_frames": 2,
     "hold_activation_frames": 1,
     "release_frames": 2,
@@ -68,21 +71,113 @@
       "multimedia": "assets/models/modelos_v2/Multimedia__pipeline.pkl"
     },
     "command_actions": {
-      "Click": { "type": "mouse_click", "button": "left", "label": "Click" },
-      "Doble": { "type": "mouse_double_click", "button": "left", "label": "Doble clic" },
-      "Seleccionar": { "type": "hotkey", "keys": ["enter"], "label": "Seleccionar" },
-      "Cerrar_Pestaña": { "type": "hotkey", "keys": ["ctrl", "w"], "label": "Cerrar pestaña" },
-      "Explorar": { "type": "hotkey", "keys": ["ctrl", "l"], "label": "Explorar" },
-      "Nueva_Pestaña": { "type": "hotkey", "keys": ["ctrl", "t"], "label": "Nueva pestaña" },
-      "Recargar": { "type": "hotkey", "keys": ["ctrl", "r"], "label": "Recargar" },
-      "Bajar": { "type": "hotkey", "keys": ["down"], "label": "Bajar" },
-      "Cerrar": { "type": "hotkey", "keys": ["alt", "f4"], "label": "Cerrar", "requires_confirmation": true },
-      "Menu": { "type": "hotkey", "keys": ["winleft"], "label": "Menu" },
-      "Subir": { "type": "hotkey", "keys": ["up"], "label": "Subir" },
-      "Anterior": { "type": "hotkey", "keys": ["prevtrack"], "label": "Anterior" },
-      "Pausa": { "type": "hotkey", "keys": ["playpause"], "label": "Pausa" },
-      "Play": { "type": "hotkey", "keys": ["playpause"], "label": "Play" },
-      "Siguiente": { "type": "hotkey", "keys": ["nexttrack"], "label": "Siguiente" }
+      "Click": {
+        "type": "mouse_click",
+        "button": "left",
+        "label": "Click"
+      },
+      "Doble": {
+        "type": "mouse_double_click",
+        "button": "left",
+        "label": "Doble clic"
+      },
+      "Seleccionar": {
+        "type": "hotkey",
+        "keys": [
+          "enter"
+        ],
+        "label": "Seleccionar"
+      },
+      "Cerrar_Pestaña": {
+        "type": "hotkey",
+        "keys": [
+          "ctrl",
+          "w"
+        ],
+        "label": "Cerrar pestaña"
+      },
+      "Explorar": {
+        "type": "hotkey",
+        "keys": [
+          "ctrl",
+          "l"
+        ],
+        "label": "Explorar"
+      },
+      "Nueva_Pestaña": {
+        "type": "hotkey",
+        "keys": [
+          "ctrl",
+          "t"
+        ],
+        "label": "Nueva pestaña"
+      },
+      "Recargar": {
+        "type": "hotkey",
+        "keys": [
+          "ctrl",
+          "r"
+        ],
+        "label": "Recargar"
+      },
+      "Bajar": {
+        "type": "hotkey",
+        "keys": [
+          "down"
+        ],
+        "label": "Bajar"
+      },
+      "Cerrar": {
+        "type": "hotkey",
+        "keys": [
+          "alt",
+          "f4"
+        ],
+        "label": "Cerrar",
+        "requires_confirmation": true
+      },
+      "Menu": {
+        "type": "hotkey",
+        "keys": [
+          "winleft"
+        ],
+        "label": "Menu"
+      },
+      "Subir": {
+        "type": "hotkey",
+        "keys": [
+          "up"
+        ],
+        "label": "Subir"
+      },
+      "Anterior": {
+        "type": "hotkey",
+        "keys": [
+          "prevtrack"
+        ],
+        "label": "Anterior"
+      },
+      "Pausa": {
+        "type": "hotkey",
+        "keys": [
+          "playpause"
+        ],
+        "label": "Pausa"
+      },
+      "Play": {
+        "type": "hotkey",
+        "keys": [
+          "playpause"
+        ],
+        "label": "Play"
+      },
+      "Siguiente": {
+        "type": "hotkey",
+        "keys": [
+          "nexttrack"
+        ],
+        "label": "Siguiente"
+      }
     }
   },
   "face_landmarks": {
@@ -103,20 +198,62 @@
       "mouth_right": 291
     },
     "offsets": {
-      "left_brow_inner": [0, 0],
-      "left_brow_mid": [0, 0],
-      "left_brow_outer": [0, 0],
-      "right_brow_inner": [0, 0],
-      "right_brow_mid": [0, 0],
-      "right_brow_outer": [0, 0],
-      "left_eye_top": [0, 0],
-      "left_eye_bottom": [0, 0],
-      "right_eye_top": [0, 0],
-      "right_eye_bottom": [0, 0],
-      "mouth_top": [0, 0],
-      "mouth_bottom": [0, 0],
-      "mouth_left": [0, 0],
-      "mouth_right": [0, 0]
+      "left_brow_inner": [
+        0,
+        0
+      ],
+      "left_brow_mid": [
+        0,
+        0
+      ],
+      "left_brow_outer": [
+        0,
+        0
+      ],
+      "right_brow_inner": [
+        0,
+        0
+      ],
+      "right_brow_mid": [
+        0,
+        0
+      ],
+      "right_brow_outer": [
+        0,
+        0
+      ],
+      "left_eye_top": [
+        0,
+        0
+      ],
+      "left_eye_bottom": [
+        0,
+        0
+      ],
+      "right_eye_top": [
+        0,
+        0
+      ],
+      "right_eye_bottom": [
+        0,
+        0
+      ],
+      "mouth_top": [
+        0,
+        0
+      ],
+      "mouth_bottom": [
+        0,
+        0
+      ],
+      "mouth_left": [
+        0,
+        0
+      ],
+      "mouth_right": [
+        0,
+        0
+      ]
     }
   },
   "profiles": {
@@ -138,51 +275,158 @@
       "gesture_actions": {
         "mouth_open": {
           "type": "hotkey",
-          "keys": ["ctrl", "c"],
+          "keys": [
+            "ctrl",
+            "c"
+          ],
           "label": "copiar"
         },
         "smile_right": {
           "type": "hotkey",
-          "keys": ["tab"],
+          "keys": [
+            "tab"
+          ],
           "label": "Tab"
         },
         "smile_left": {
           "type": "hotkey",
-          "keys": ["backspace"],
+          "keys": [
+            "backspace"
+          ],
           "label": "Eliminar"
         },
         "mouth_pucker": {
           "type": "hotkey",
-          "keys": ["ctrl", "v"],
+          "keys": [
+            "ctrl",
+            "v"
+          ],
           "label": "Pegar"
         },
         "smile": {
           "type": "hotkey",
-          "keys": ["ctrl", "x"],
+          "keys": [
+            "ctrl",
+            "x"
+          ],
           "label": "Cortar"
         },
         "eye_wide": {
           "type": "hotkey",
-          "keys": ["enter"],
+          "keys": [
+            "enter"
+          ],
           "label": "Enter"
         }
       },
       "voice_actions": {
-        "Click": { "type": "mouse_click", "button": "left", "label": "Click" },
-        "Doble": { "type": "mouse_double_click", "button": "left", "label": "Doble clic" },
-        "Seleccionar": { "type": "hotkey", "keys": ["enter"], "label": "Seleccionar" },
-        "Cerrar_Pestaña": { "type": "hotkey", "keys": ["ctrl", "w"], "label": "Cerrar pestaña" },
-        "Explorar": { "type": "hotkey", "keys": ["ctrl", "l"], "label": "Explorar" },
-        "Nueva_Pestaña": { "type": "hotkey", "keys": ["ctrl", "t"], "label": "Nueva pestaña" },
-        "Recargar": { "type": "hotkey", "keys": ["ctrl", "r"], "label": "Recargar" },
-        "Bajar": { "type": "hotkey", "keys": ["down"], "label": "Bajar" },
-        "Cerrar": { "type": "hotkey", "keys": ["alt", "f4"], "label": "Cerrar", "requires_confirmation": true },
-        "Menu": { "type": "hotkey", "keys": ["winleft"], "label": "Menu" },
-        "Subir": { "type": "hotkey", "keys": ["up"], "label": "Subir" },
-        "Anterior": { "type": "hotkey", "keys": ["prevtrack"], "label": "Anterior" },
-        "Pausa": { "type": "hotkey", "keys": ["playpause"], "label": "Pausa" },
-        "Play": { "type": "hotkey", "keys": ["playpause"], "label": "Play" },
-        "Siguiente": { "type": "hotkey", "keys": ["nexttrack"], "label": "Siguiente" }
+        "Click": {
+          "type": "mouse_click",
+          "button": "left",
+          "label": "Click"
+        },
+        "Doble": {
+          "type": "mouse_double_click",
+          "button": "left",
+          "label": "Doble clic"
+        },
+        "Seleccionar": {
+          "type": "hotkey",
+          "keys": [
+            "enter"
+          ],
+          "label": "Seleccionar"
+        },
+        "Cerrar_Pestaña": {
+          "type": "hotkey",
+          "keys": [
+            "ctrl",
+            "w"
+          ],
+          "label": "Cerrar pestaña"
+        },
+        "Explorar": {
+          "type": "hotkey",
+          "keys": [
+            "ctrl",
+            "l"
+          ],
+          "label": "Explorar"
+        },
+        "Nueva_Pestaña": {
+          "type": "hotkey",
+          "keys": [
+            "ctrl",
+            "t"
+          ],
+          "label": "Nueva pestaña"
+        },
+        "Recargar": {
+          "type": "hotkey",
+          "keys": [
+            "ctrl",
+            "r"
+          ],
+          "label": "Recargar"
+        },
+        "Bajar": {
+          "type": "hotkey",
+          "keys": [
+            "down"
+          ],
+          "label": "Bajar"
+        },
+        "Cerrar": {
+          "type": "hotkey",
+          "keys": [
+            "alt",
+            "f4"
+          ],
+          "label": "Cerrar",
+          "requires_confirmation": true
+        },
+        "Menu": {
+          "type": "hotkey",
+          "keys": [
+            "winleft"
+          ],
+          "label": "Menu"
+        },
+        "Subir": {
+          "type": "hotkey",
+          "keys": [
+            "up"
+          ],
+          "label": "Subir"
+        },
+        "Anterior": {
+          "type": "hotkey",
+          "keys": [
+            "prevtrack"
+          ],
+          "label": "Anterior"
+        },
+        "Pausa": {
+          "type": "hotkey",
+          "keys": [
+            "playpause"
+          ],
+          "label": "Pausa"
+        },
+        "Play": {
+          "type": "hotkey",
+          "keys": [
+            "playpause"
+          ],
+          "label": "Play"
+        },
+        "Siguiente": {
+          "type": "hotkey",
+          "keys": [
+            "nexttrack"
+          ],
+          "label": "Siguiente"
+        }
       },
       "mouse_settings": {
         "enabled": true,
@@ -200,8 +444,8 @@
         "mouth_open": 0.6,
         "mouth_funnel": 0.5,
         "smile": 0.5,
-        "smile_left": 0.5,
-        "smile_right": 0.5,
+        "smile_left": 0.35,
+        "smile_right": 0.35,
         "brow_raise": 0.5,
         "brow_frown": 0.4,
         "eye_blink": 0.7,
@@ -212,22 +456,31 @@
       "gesture_actions": {
         "smile_right": {
           "type": "hotkey",
-          "keys": ["tab"],
+          "keys": [
+            "tab"
+          ],
           "label": "Siguiente control"
         },
         "smile_left": {
           "type": "hotkey",
-          "keys": ["shift", "tab"],
+          "keys": [
+            "shift",
+            "tab"
+          ],
           "label": "Control anterior"
         },
         "mouth_open": {
           "type": "hotkey",
-          "keys": ["enter"],
+          "keys": [
+            "enter"
+          ],
           "label": "Activar"
         },
         "mouth_pucker": {
           "type": "hotkey",
-          "keys": ["esc"],
+          "keys": [
+            "esc"
+          ],
           "label": "Volver"
         },
         "eye_wide": {
@@ -242,17 +495,24 @@
         },
         "brow_raise": {
           "type": "hotkey",
-          "keys": ["pageup"],
+          "keys": [
+            "pageup"
+          ],
           "label": "Subir pagina"
         },
         "brow_frown": {
           "type": "hotkey",
-          "keys": ["pagedown"],
+          "keys": [
+            "pagedown"
+          ],
           "label": "Bajar pagina"
         },
         "smile": {
           "type": "hotkey",
-          "keys": ["ctrl", "l"],
+          "keys": [
+            "ctrl",
+            "l"
+          ],
           "label": "Ir a barra"
         }
       },
@@ -272,8 +532,8 @@
         "mouth_open": 0.6,
         "mouth_funnel": 0.5,
         "smile": 0.5,
-        "smile_left": 0.5,
-        "smile_right": 0.5,
+        "smile_left": 0.35,
+        "smile_right": 0.35,
         "brow_raise": 0.5,
         "brow_frown": 0.4,
         "eye_blink": 0.7,
@@ -284,37 +544,51 @@
       "gesture_actions": {
         "smile_left": {
           "type": "key_hold",
-          "keys": ["left"],
+          "keys": [
+            "left"
+          ],
           "label": "Mantener izquierda"
         },
         "smile_right": {
           "type": "key_hold",
-          "keys": ["right"],
+          "keys": [
+            "right"
+          ],
           "label": "Mantener derecha"
         },
         "brow_raise": {
           "type": "key_hold",
-          "keys": ["up"],
+          "keys": [
+            "up"
+          ],
           "label": "Mantener arriba"
         },
         "brow_frown": {
           "type": "key_hold",
-          "keys": ["down"],
+          "keys": [
+            "down"
+          ],
           "label": "Mantener abajo"
         },
         "mouth_pucker": {
           "type": "hotkey",
-          "keys": ["space"],
+          "keys": [
+            "space"
+          ],
           "label": "Saltar"
         },
         "mouth_open": {
           "type": "hotkey",
-          "keys": ["enter"],
+          "keys": [
+            "enter"
+          ],
           "label": "Confirmar"
         },
         "eye_wide": {
           "type": "hotkey",
-          "keys": ["esc"],
+          "keys": [
+            "esc"
+          ],
           "label": "Pausa"
         }
       },

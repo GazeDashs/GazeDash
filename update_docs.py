@@ -50,7 +50,7 @@ steps = [
     "FacialGestureDetector convierte las métricas en gestos discretos usando calibración "
      "neutral adaptativa (primeros ~5 s) y debouncing por frames consecutivos.",
     "Los gestos activos se mapean a acciones del perfil activo (hotkeys, clicks) "
-     "mediante gesture_mapper y HotkeyExecutor (pyautogui).",
+     "mediante gesture_mapper y HotkeyExecutor (pydirectinput).",
     "MouseController mueve el cursor según la posición relativa de la nariz respecto "
      "a un centro recalibrable. Aplica zona muerta, velocidad máxima y suavizado EMA.",
     "BlinkClickController detecta guiños unilaterales (un ojo cerrado, el otro abierto) "
@@ -164,7 +164,7 @@ archivos = [
     ("core/input/mouse_controller.py", "MouseController: zona muerta, velocidad, suavizado EMA"),
     ("core/input/blink_click_controller.py", "BlinkClickController: guiños unilaterales → clicks"),
     ("core/voice_control/voice_control.py", "VoiceCommandController: máquina de estados de voz"),
-    ("core/gesture_engine/hotkey_executor.py", "Ejecución de hotkeys/clicks con pyautogui"),
+    ("core/gesture_engine/hotkey_executor.py", "Ejecución de hotkeys/clicks con pydirectinput"),
     ("config/default_config.json", "Config por defecto: perfiles, umbrales, voz, mouse"),
 ]
 for a, r in archivos:
@@ -206,7 +206,7 @@ features = [
     ("Gestos faciales", "✅ Hecha / en ajuste",
      "Detecta boca, sonrisa, cejas, guiño, ojos abiertos y nariz; debounce y calibración neutral adaptativa."),
     ("Mapeo gesto → acción", "✅ Hecha",
-     "Acciones por perfil usando hotkeys con pyautogui."),
+     "Acciones por perfil usando hotkeys con pydirectinput."),
     ("Mouse por nariz", "✅ Hecha",
      "Movimiento relativo con centro recalibrable, zona muerta, velocidad y suavizado. Toggle en Config."),
     ("Clic por guiño", "✅ Hecha",
@@ -342,7 +342,7 @@ riesgos = [
     ("Umbrales calibrados para una sola persona",
      "Falsos positivos en otros usuarios.",
      "Calibración guiada en primera ejecución y perfiles por usuario."),
-    ("Acciones pyautogui disparan sobre el sistema real durante pruebas",
+    ("Acciones pydirectinput disparan sobre el sistema real durante pruebas",
      "Acciones no deseadas.",
      "Modo simulación/test sin ejecución real y confirmaciones para acciones peligrosas."),
     ("Código experimental (AppController) mezclado con ruta principal",

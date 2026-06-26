@@ -1,5 +1,5 @@
 import time
-import pyautogui
+import pydirectinput
 
 
 class BlinkClickController:
@@ -22,6 +22,8 @@ class BlinkClickController:
         self.last_left_click = 0.0
         self.last_right_click = 0.0
 
+        pydirectinput.FAILSAFE = False
+
     def update(self, face_data):
 
         left = face_data.get("eye_blink_left", 0.0)
@@ -43,13 +45,13 @@ class BlinkClickController:
                 now - self.left_start > self.max_hold_time
                 and now - self.last_left_click > self.cooldown
             ):
-                pyautogui.click(button="left")
+                pydirectinput.click(button="left")
                 self.last_left_click = now
                 self.left_active = False
         elif self.left_active:
             duration = now - self.left_start
             if duration >= self.min_hold_time and now - self.last_left_click > self.cooldown:
-                pyautogui.click(button="left")
+                pydirectinput.click(button="left")
                 self.last_left_click = now
             self.left_active = False
 
@@ -62,12 +64,12 @@ class BlinkClickController:
                 now - self.right_start > self.max_hold_time
                 and now - self.last_right_click > self.cooldown
             ):
-                pyautogui.click(button="right")
+                pydirectinput.click(button="right")
                 self.last_right_click = now
                 self.right_active = False
         elif self.right_active:
             duration = now - self.right_start
             if duration >= self.min_hold_time and now - self.last_right_click > self.cooldown:
-                pyautogui.click(button="right")
+                pydirectinput.click(button="right")
                 self.last_right_click = now
             self.right_active = False

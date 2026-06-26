@@ -3,7 +3,7 @@ opencv-python>=4.13.0.92
 numpy>=2.0
 mediapipe>=0.10.0
 customtkinter>=5.2.0
-pyautogui
+pydirectinput
 librosa
 soundfile
 sounddevice

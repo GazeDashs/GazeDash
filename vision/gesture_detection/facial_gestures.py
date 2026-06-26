@@ -60,8 +60,8 @@ class FacialGestureThresholds:
     eye_wide: float = 0.6
     nose_sneer: float = 0.4
     smile: float = 0.5
-    smile_left: float = 0.5
-    smile_right: float = 0.5
+    smile_left: float = 0.35
+    smile_right: float = 0.35
     mouth_conflict_margin: float = 0.05
 
 
@@ -380,9 +380,18 @@ class FacialGestureDetector:
         smile_right_delta = metrics.get("smile_right", 0.0) - self._neutral_value("smile_right")
         smile_left_threshold = self._scaled_threshold("smile_left", self.thresholds.smile_left)
         smile_right_threshold = self._scaled_threshold("smile_right", self.thresholds.smile_right)
+        smile_threshold = self._scaled_threshold("smile", self.thresholds.smile)
         smile_left_score = self._ratio(smile_left_delta, smile_left_threshold)
         smile_right_score = self._ratio(smile_right_delta, smile_right_threshold)
-        smile_score = min(smile_left_score, smile_right_score)
+        
+        # A bilateral smile requires both sides to be active.
+        # We penalize the score if it's highly asymmetric to prevent unilateral
+        # smiles from triggering the bilateral smile.
+        asymmetry = abs(smile_left_delta - smile_right_delta)
+        symmetric_base = min(smile_left_delta, smile_right_delta)
+        # If the asymmetry is larger than the base, reduce the base.
+        adjusted_base = max(0.0, symmetric_base - (asymmetry * 0.5))
+        smile_score = self._ratio(adjusted_base, smile_threshold)
 
         brow_raise_threshold = self._scaled_threshold("brow_raise", self.thresholds.brow_raise)
         brow_raise_inner_delta = metrics.get("brow_inner_up", 0.0) - self._neutral_value("brow_inner_up")
@@ -421,6 +430,7 @@ class FacialGestureDetector:
             "mouth_pucker": mouth_pucker_score >= 1.0 and mouth_pucker_support,
             "mouth_open": mouth_open,
             "mouth_o": mouth_o,
+            "smile": smile_score >= 1.0,
             "smile_left": smile_left_score >= 1.0,
             "smile_right": smile_right_score >= 1.0,
             # brow_raise and brow_frown must come from eyebrow motion, not from
@@ -445,7 +455,7 @@ class FacialGestureDetector:
                 "mouth_o": self._score_payload(mouth_o_score, 1.0, raw_gestures["mouth_o"], detail="mouthFunnel+jawOpen"),
                 "smile_left": self._score_payload(smile_left_score, 1.0, raw_gestures["smile_left"], detail="mouthSmileLeft"),
                 "smile_right": self._score_payload(smile_right_score, 1.0, raw_gestures["smile_right"], detail="mouthSmileRight"),
-                "smile": self._score_payload(smile_score, 1.0, False, detail="left+right smile"),
+                "smile": self._score_payload(smile_score, 1.0, raw_gestures["smile"], detail="bilateral smile"),
                 "brow_raise": self._score_payload(brow_raise_score, 1.0, raw_gestures["brow_raise"], detail="browInnerUp|browRatio"),
                 "brow_frown": self._score_payload(brow_frown_score, 1.0, raw_gestures["brow_frown"], detail="browDown"),
                 "eye_blink": self._score_payload(eye_blink_score, 1.0, raw_gestures["eye_blink"], detail="one-eye blink"),
@@ -495,18 +505,6 @@ class FacialGestureDetector:
             required = self.GESTURE_DEBOUNCE_FRAMES.get(name, 1)
             gestures[name] = cur >= required
 
-        # Treat the bilateral smile as the conjunction of the two confirmed side smiles.
-        # This lets `smile` fire even when left/right reach threshold on adjacent frames.
-        gestures["smile"] = bool(gestures.get("smile_left")) and bool(gestures.get("smile_right"))
-        gesture_scores["smile"]["active_raw"] = bool(raw_gestures.get("smile_left")) and bool(raw_gestures.get("smile_right"))
-        gesture_scores["smile"]["confidence"] = min(
-            float(gesture_scores["smile_left"]["confidence"]),
-            float(gesture_scores["smile_right"]["confidence"]),
-        )
-        gesture_scores["smile"]["margin"] = min(
-            float(gesture_scores["smile_left"]["margin"]),
-            float(gesture_scores["smile_right"]["margin"]),
-        )
         gestures["gesture_scores"] = gesture_scores
 
         if not any(

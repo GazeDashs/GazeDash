@@ -103,6 +103,18 @@ def clone_profile(config, new_profile_name, source_profile_name=None):
     return updated
 
 
+def rename_profile(config, old_profile_name, new_profile_name):
+    updated = deepcopy(config) if isinstance(config, dict) else {}
+    profiles = updated.setdefault("profiles", {})
+    if old_profile_name in profiles and new_profile_name and new_profile_name != old_profile_name:
+        profile_data = profiles.pop(old_profile_name)
+        profile_data["display_name"] = new_profile_name.replace("_", " ").title()
+        profiles[new_profile_name] = profile_data
+        if updated.get("active_profile") == old_profile_name:
+            updated["active_profile"] = new_profile_name
+    return updated
+
+
 def get_profile_mouse_settings(config, profile_name=None):
     _, profile = get_profile_details(config, profile_name)
     defaults = {

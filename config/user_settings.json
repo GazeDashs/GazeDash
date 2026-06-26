@@ -1,5 +1,5 @@
 {
-  "active_profile": "Flappy",
+  "active_profile": "Baba",
   "smoothing_alpha": 0.5,
   "gesture_cooldown": 0.5,
   "gesture_arbitration": {
@@ -602,8 +602,8 @@
         "center": null
       }
     },
-    "Flappy": {
-      "display_name": "Navegación",
+    "Baba": {
+      "display_name": "Baba",
       "description": "Perfil base para control asistivo con la cara. Diseñado para disparar acciones de navegación, edición y confirmación mediante gestos faciales.",
       "gesture_thresholds": {
         "mouth_pucker": 0.5,

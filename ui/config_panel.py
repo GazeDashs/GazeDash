@@ -10,6 +10,7 @@ from ui.settings_store import (
     AVAILABLE_GESTURE_NAMES,
     GESTURE_THRESHOLD_KEYS,
     clone_profile,
+    rename_profile,
     get_active_profile_name,
     get_effective_thresholds,
     get_profile_actions,
@@ -204,8 +205,12 @@ def open_config_panel(master=None, config_manager=None):
     profile_card.grid(row=0, column=0, sticky="ew", pady=(0, 16))
 
     profile_names = list(get_profiles(state["config"]).keys()) or [get_active_profile_name(state["config"])]
-    profile_selector = ctk.CTkOptionMenu(profile_body, values=profile_names)
-    profile_selector.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+    profile_selector_row = ctk.CTkFrame(profile_body, fg_color="transparent")
+    profile_selector_row.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+    profile_selector_row.grid_columnconfigure(0, weight=1)
+    
+    profile_selector = ctk.CTkOptionMenu(profile_selector_row, values=profile_names)
+    profile_selector.grid(row=0, column=0, sticky="ew", padx=(0, 6))
     profile_selector.set(get_active_profile_name(state["config"]))
 
     profile_info = ctk.CTkLabel(profile_body, text="", justify="left", anchor="w", wraplength=430)
@@ -466,6 +471,30 @@ def open_config_panel(master=None, config_manager=None):
         refresh_all(new_name)
         messagebox.showinfo("GazeDash", f"Perfil creado: {new_name}")
 
+    def rename_current_profile():
+        old_name = current_profile_name()
+        dialog = ctk.CTkInputDialog(text=f"Ingresa el nuevo nombre para el perfil '{old_name}':", title="Renombrar perfil")
+        new_name = dialog.get_input()
+        if not new_name:
+            return
+        new_name = new_name.strip()
+        if not new_name or new_name == old_name:
+            return
+        if new_name in get_profiles(current_config()):
+            messagebox.showwarning("GazeDash", "Ya existe un perfil con ese nombre.")
+            return
+
+        updated = rename_profile(current_config(), old_name, new_name)
+        state["config"] = updated
+        save_config(updated)
+
+        profile_names = list(get_profiles(updated).keys())
+        form_state["profile_names"] = profile_names
+        profile_selector.configure(values=profile_names)
+        profile_selector.set(new_name)
+        refresh_all(new_name)
+        messagebox.showinfo("GazeDash", f"Perfil renombrado a: {new_name}")
+
     def save_binding():
         selected_profile = current_profile_name()
         selected_gesture = current_gesture_name()
@@ -617,6 +646,7 @@ def open_config_panel(master=None, config_manager=None):
                 text_color="#6EE7B7",
             )
 
+    create_button(profile_selector_row, "Renombrar", rename_current_profile).grid(row=0, column=1, sticky="e")
     create_button(new_profile_row, "Crear perfil", create_profile).grid(row=0, column=2, sticky="e", padx=(12, 0))
     create_button(binding_buttons, "Guardar gesto", save_binding).grid(row=0, column=0, sticky="ew", padx=(0, 6))
     create_button(binding_buttons, "Eliminar gesto", delete_binding).grid(row=0, column=1, sticky="ew", padx=6)

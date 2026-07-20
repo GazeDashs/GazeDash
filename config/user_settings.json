@@ -1,8 +1,185 @@
 {
-  "active_profile": "Flappy",
+  "active_profile": "Baba",
   "smoothing_alpha": 0.5,
   "gesture_cooldown": 0.5,
+  "gesture_arbitration": {
+    "enabled": true,
+    "mode": "realtime",
+    "realtime_confidence": 0.85,
+    "realtime_margin": 0.15,
+    "realtime_action_types": [
+      "hotkey",
+      "key_hold"
+    ],
+    "activation_frames": 2,
+    "hold_activation_frames": 1,
+    "release_frames": 2,
+    "hold_release_frames": 1,
+    "activation_frames_by_gesture": {
+      "mouth_o": 3,
+      "smile": 3,
+      "brow_raise": 3,
+      "brow_frown": 3,
+      "eye_blink": 3
+    },
+    "release_frames_by_gesture": {
+      "mouth_o": 2,
+      "smile": 2,
+      "brow_raise": 2,
+      "brow_frown": 2,
+      "eye_blink": 2
+    },
+    "priorities": {
+      "mouth_pucker": 30,
+      "mouth_o": 20,
+      "mouth_open": 10,
+      "smile": 30,
+      "smile_right": 20,
+      "smile_left": 20,
+      "eye_wide": 20,
+      "eye_blink": 10,
+      "brow_raise": 20,
+      "brow_frown": 20,
+      "nose_sneer": 10
+    }
+  },
+  "gesture_diagnostics": {
+    "enabled": true,
+    "log_dir": "logs/gesture_diagnostics",
+    "min_interval_seconds": 0.25,
+    "only_log_changes": true
+  },
   "camera_index": 0,
+  "voice_control": {
+    "enabled": false,
+    "activation_gesture": "",
+    "activation_word": "",
+    "listen_duration": 2.0,
+    "cooldown_seconds": 1.5,
+    "sample_rate": 16000,
+    "gain": 7.876712328767123,
+    "min_confidence": 0.65,
+    "active_module": null,
+    "repeat_guard_enabled": true,
+    "dangerous_confirmation_enabled": true,
+    "logs_enabled": true,
+    "model_paths": {
+      "activacion": "assets/models/modelos_v2/Activacion__pipeline.pkl",
+      "accesibilidad": "assets/models/modelos_v2/Accesibilidad__pipeline.pkl",
+      "web": "assets/models/modelos_v2/Web__pipeline.pkl",
+      "navegacion": "assets/models/modelos_v2/Navegacion__pipeline.pkl",
+      "multimedia": "assets/models/modelos_v2/Multimedia__pipeline.pkl"
+    },
+    "command_actions": {
+      "Click": {
+        "type": "mouse_click",
+        "button": "left",
+        "label": "Click"
+      },
+      "Doble": {
+        "type": "mouse_double_click",
+        "button": "left",
+        "label": "Doble clic"
+      },
+      "Seleccionar": {
+        "type": "hotkey",
+        "keys": [
+          "enter"
+        ],
+        "label": "Seleccionar"
+      },
+      "Cerrar_Pestaña": {
+        "type": "hotkey",
+        "keys": [
+          "ctrl",
+          "w"
+        ],
+        "label": "Cerrar pestaña"
+      },
+      "Explorar": {
+        "type": "hotkey",
+        "keys": [
+          "ctrl",
+          "l"
+        ],
+        "label": "Explorar"
+      },
+      "Nueva_Pestaña": {
+        "type": "hotkey",
+        "keys": [
+          "ctrl",
+          "t"
+        ],
+        "label": "Nueva pestaña"
+      },
+      "Recargar": {
+        "type": "hotkey",
+        "keys": [
+          "ctrl",
+          "r"
+        ],
+        "label": "Recargar"
+      },
+      "Bajar": {
+        "type": "hotkey",
+        "keys": [
+          "down"
+        ],
+        "label": "Bajar"
+      },
+      "Cerrar": {
+        "type": "hotkey",
+        "keys": [
+          "alt",
+          "f4"
+        ],
+        "label": "Cerrar",
+        "requires_confirmation": true
+      },
+      "Menu": {
+        "type": "hotkey",
+        "keys": [
+          "winleft"
+        ],
+        "label": "Menu"
+      },
+      "Subir": {
+        "type": "hotkey",
+        "keys": [
+          "up"
+        ],
+        "label": "Subir"
+      },
+      "Anterior": {
+        "type": "hotkey",
+        "keys": [
+          "prevtrack"
+        ],
+        "label": "Anterior"
+      },
+      "Pausa": {
+        "type": "hotkey",
+        "keys": [
+          "playpause"
+        ],
+        "label": "Pausa"
+      },
+      "Play": {
+        "type": "hotkey",
+        "keys": [
+          "playpause"
+        ],
+        "label": "Play"
+      },
+      "Siguiente": {
+        "type": "hotkey",
+        "keys": [
+          "nexttrack"
+        ],
+        "label": "Siguiente"
+      }
+    }
+  },
   "face_landmarks": {
     "indices": {
       "left_brow_inner": 70,
@@ -87,15 +264,15 @@
         "mouth_pucker": 0.5,
         "mouth_open": 0.03712408360319268,
         "mouth_funnel": 0.5,
-        "smile": 0.02566964285714286,
+        "smile": 0.5,
         "brow_raise": 0.0759375,
         "brow_frown": 0.12018362545967103,
         "eye_blink": 0.07697097962965405,
         "eye_wide": 0.0225,
         "nose_sneer": 0.01,
         "mouth_conflict_margin": 0.05,
-        "smile_left": 0.5,
-        "smile_right": 0.5
+        "smile_left": 0.35,
+        "smile_right": 0.35
       },
       "gesture_actions": {
         "mouth_open": {
@@ -144,6 +321,115 @@
           "label": "Enter"
         }
       },
+      "voice_actions": {
+        "Click": {
+          "type": "mouse_click",
+          "button": "left",
+          "label": "Click"
+        },
+        "Doble": {
+          "type": "mouse_double_click",
+          "button": "left",
+          "label": "Doble clic"
+        },
+        "Seleccionar": {
+          "type": "hotkey",
+          "keys": [
+            "enter"
+          ],
+          "label": "Seleccionar"
+        },
+        "Cerrar_Pestaña": {
+          "type": "hotkey",
+          "keys": [
+            "ctrl",
+            "w"
+          ],
+          "label": "Cerrar pestaña"
+        },
+        "Explorar": {
+          "type": "hotkey",
+          "keys": [
+            "ctrl",
+            "l"
+          ],
+          "label": "Explorar"
+        },
+        "Nueva_Pestaña": {
+          "type": "hotkey",
+          "keys": [
+            "ctrl",
+            "t"
+          ],
+          "label": "Nueva pestaña"
+        },
+        "Recargar": {
+          "type": "hotkey",
+          "keys": [
+            "ctrl",
+            "r"
+          ],
+          "label": "Recargar"
+        },
+        "Bajar": {
+          "type": "hotkey",
+          "keys": [
+            "down"
+          ],
+          "label": "Bajar"
+        },
+        "Cerrar": {
+          "type": "hotkey",
+          "keys": [
+            "alt",
+            "f4"
+          ],
+          "label": "Cerrar",
+          "requires_confirmation": true
+        },
+        "Menu": {
+          "type": "hotkey",
+          "keys": [
+            "winleft"
+          ],
+          "label": "Menu"
+        },
+        "Subir": {
+          "type": "hotkey",
+          "keys": [
+            "up"
+          ],
+          "label": "Subir"
+        },
+        "Anterior": {
+          "type": "hotkey",
+          "keys": [
+            "prevtrack"
+          ],
+          "label": "Anterior"
+        },
+        "Pausa": {
+          "type": "hotkey",
+          "keys": [
+            "playpause"
+          ],
+          "label": "Pausa"
+        },
+        "Play": {
+          "type": "hotkey",
+          "keys": [
+            "playpause"
+          ],
+          "label": "Play"
+        },
+        "Siguiente": {
+          "type": "hotkey",
+          "keys": [
+            "nexttrack"
+          ],
+          "label": "Siguiente"
+        }
+      },
       "mouse_settings": {
         "enabled": true,
         "dead_zone": 25.0,
@@ -152,30 +438,221 @@
         "center": null
       }
     },
-    "Flappy": {
-      "display_name": "Navegación",
-      "description": "Perfil base para control asistivo con la cara. Diseñado para disparar acciones de navegación, edición y confirmación mediante gestos faciales.",
+    "accesibilidad_pc": {
+      "display_name": "Accesibilidad PC",
+      "description": "Perfil para tareas basicas de escritorio: mover cursor con nariz, avanzar controles, activar, volver y desplazarse.",
       "gesture_thresholds": {
         "mouth_pucker": 0.5,
-        "mouth_open": 0.03712408360319268,
+        "mouth_open": 0.6,
         "mouth_funnel": 0.5,
-        "smile": 0.02566964285714286,
-        "smile_left": 0.5,
-        "smile_right": 0.5,
-        "brow_raise": 0.0759375,
-        "brow_frown": 0.12018362545967103,
-        "eye_blink": 0.07697097962965405,
-        "eye_wide": 0.0225,
-        "nose_sneer": 0.01,
+        "smile": 0.5,
+        "smile_left": 0.35,
+        "smile_right": 0.35,
+        "brow_raise": 0.5,
+        "brow_frown": 0.4,
+        "eye_blink": 0.7,
+        "eye_wide": 0.6,
+        "nose_sneer": 0.4,
         "mouth_conflict_margin": 0.05
       },
       "gesture_actions": {
+        "smile_right": {
+          "type": "hotkey",
+          "keys": [
+            "tab"
+          ],
+          "label": "Siguiente control"
+        },
+        "smile_left": {
+          "type": "hotkey",
+          "keys": [
+            "shift",
+            "tab"
+          ],
+          "label": "Control anterior"
+        },
+        "mouth_open": {
+          "type": "hotkey",
+          "keys": [
+            "enter"
+          ],
+          "label": "Activar"
+        },
+        "mouth_pucker": {
+          "type": "hotkey",
+          "keys": [
+            "esc"
+          ],
+          "label": "Volver"
+        },
+        "eye_wide": {
+          "type": "mouse_click",
+          "button": "left",
+          "label": "Click"
+        },
+        "nose_sneer": {
+          "type": "mouse_double_click",
+          "button": "left",
+          "label": "Doble click"
+        },
+        "brow_raise": {
+          "type": "hotkey",
+          "keys": [
+            "pageup"
+          ],
+          "label": "Subir pagina"
+        },
+        "brow_frown": {
+          "type": "hotkey",
+          "keys": [
+            "pagedown"
+          ],
+          "label": "Bajar pagina"
+        },
+        "smile": {
+          "type": "hotkey",
+          "keys": [
+            "ctrl",
+            "l"
+          ],
+          "label": "Ir a barra"
+        }
+      },
+      "mouse_settings": {
+        "enabled": true,
+        "dead_zone": 22.0,
+        "max_speed": 32.0,
+        "smoothing": 0.24,
+        "center": null
+      }
+    },
+    "juego_simple": {
+      "display_name": "Juego simple",
+      "description": "Perfil para juegos sencillos: gestos laterales sostienen flechas, cejas sostienen arriba/abajo y boca ejecuta salto o confirmar.",
+      "gesture_thresholds": {
+        "mouth_pucker": 0.5,
+        "mouth_open": 0.6,
+        "mouth_funnel": 0.5,
+        "smile": 0.5,
+        "smile_left": 0.35,
+        "smile_right": 0.35,
+        "brow_raise": 0.5,
+        "brow_frown": 0.4,
+        "eye_blink": 0.7,
+        "eye_wide": 0.6,
+        "nose_sneer": 0.4,
+        "mouth_conflict_margin": 0.05
+      },
+      "gesture_actions": {
+        "smile_left": {
+          "type": "key_hold",
+          "keys": [
+            "left"
+          ],
+          "label": "Mantener izquierda"
+        },
+        "smile_right": {
+          "type": "key_hold",
+          "keys": [
+            "right"
+          ],
+          "label": "Mantener derecha"
+        },
+        "brow_raise": {
+          "type": "key_hold",
+          "keys": [
+            "up"
+          ],
+          "label": "Mantener arriba"
+        },
+        "brow_frown": {
+          "type": "key_hold",
+          "keys": [
+            "down"
+          ],
+          "label": "Mantener abajo"
+        },
         "mouth_pucker": {
           "type": "hotkey",
           "keys": [
             "space"
           ],
-          "label": "saltar"
+          "label": "Saltar"
+        },
+        "mouth_open": {
+          "type": "hotkey",
+          "keys": [
+            "enter"
+          ],
+          "label": "Confirmar"
+        },
+        "eye_wide": {
+          "type": "hotkey",
+          "keys": [
+            "esc"
+          ],
+          "label": "Pausa"
+        }
+      },
+      "mouse_settings": {
+        "enabled": false,
+        "dead_zone": 25.0,
+        "max_speed": 35.0,
+        "smoothing": 0.2,
+        "center": null
+      }
+    },
+    "Baba": {
+      "display_name": "Baba",
+      "description": "Perfil base para control asistivo con la cara. Diseñado para disparar acciones de navegación, edición y confirmación mediante gestos faciales.",
+      "gesture_thresholds": {
+        "mouth_pucker": 0.5,
+        "mouth_open": 0.03712408360319268,
+        "mouth_o": 0.5,
+        "smile": 0.3741258741258741,
+        "smile_left": 0.35,
+        "smile_right": 0.35,
+        "brow_raise": 0.19298245614035087,
+        "brow_frown": 0.1783216783216783,
+        "eye_blink": 0.10739191073919108,
+        "eye_wide": 0.04741980474198047,
+        "nose_sneer": 0.01
+      },
+      "gesture_actions": {
+        "mouth_pucker": {
+          "type": "hotkey",
+          "label": "mouth_pucker",
+          "keys": [
+            "space"
+          ]
+        },
+        "smile_left": {
+          "type": "key_hold",
+          "label": "smile_left",
+          "keys": [
+            "d"
+          ]
+        },
+        "smile_right": {
+          "type": "key_hold",
+          "label": "smile_right",
+          "keys": [
+            "a"
+          ]
+        },
+        "brow_raise": {
+          "type": "key_hold",
+          "label": "brow_raise",
+          "keys": [
+            "w"
+          ]
+        },
+        "brow_frown": {
+          "type": "key_hold",
+          "label": "brow_frown",
+          "keys": [
+            "s"
+          ]
         }
       },
       "mouse_settings": {
@@ -184,8 +661,8 @@
         "max_speed": 100.0,
         "smoothing": 0.1600790513833992,
         "center": [
-          326.0,
-          225.0
+          287.0,
+          291.0
         ]
       }
     }
@@ -193,16 +670,15 @@
   "gesture_thresholds": {
     "mouth_pucker": 0.5,
     "mouth_open": 0.03712408360319268,
-    "mouth_funnel": 0.5,
-    "smile": 0.02566964285714286,
-    "smile_left": 0.5,
-    "smile_right": 0.5,
-    "brow_raise": 0.0759375,
-    "brow_frown": 0.12018362545967103,
-    "eye_blink": 0.07697097962965405,
-    "eye_wide": 0.0225,
-    "nose_sneer": 0.01,
-    "mouth_conflict_margin": 0.05
+    "mouth_o": 0.5,
+    "smile": 0.3741258741258741,
+    "smile_left": 0.35,
+    "smile_right": 0.35,
+    "brow_raise": 0.19298245614035087,
+    "brow_frown": 0.1783216783216783,
+    "eye_blink": 0.10739191073919108,
+    "eye_wide": 0.04741980474198047,
+    "nose_sneer": 0.01
   },
   "initial_gesture_calibrated": true
 }

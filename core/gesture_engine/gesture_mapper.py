@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from config.config_manager import ConfigManager
+
 
 DEFAULT_GESTURE_MAP = {
     "blink": {"type": "action", "name": "click"}
@@ -24,21 +26,15 @@ def load_config(config_path: Optional[Path] = None) -> Dict[str, Any]:
     default_path = Path("config") / "default_config.json"
     legacy_default_path = Path("config") / "default_Config.json"
 
-    base_config = {}
-    user_config = {}
-
     config_source = default_path if default_path.exists() else legacy_default_path
     if config_source.exists():
-        with open(config_source, "r", encoding="utf-8") as fh:
-            base_config = json.load(fh)
+        return ConfigManager(config_path, config_source).load_merged()
 
     if config_path.exists():
         with open(config_path, "r", encoding="utf-8") as fh:
-            user_config = json.load(fh)
+            return json.load(fh)
 
-    merged_config = base_config.copy()
-    merged_config.update(user_config)
-    return merged_config
+    return {}
 
 
 def get_active_profile(config: Dict[str, Any]) -> Dict[str, Any]:

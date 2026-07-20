@@ -1,6 +1,6 @@
 # GazeDash
-
 Software de accesibilidad que permite controlar la computadora mediante **gestos faciales**, **movimiento de nariz/cabeza** y **comandos de voz**, usando una cámara web estándar como único hardware adicional.
+
 
 ---
 
